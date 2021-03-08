@@ -689,5 +689,58 @@ def demo6(image_paths, output_dir, cuda):
                 raw_image=raw_images[j],
             )
 
+@main.command()
+@click.option("-i", "--image-paths", type=str, multiple=True, required=True)
+#@click.option("-a", "--arch", type=click.Choice(model_names), required=True)
+@click.option("-o", "--output-dir", type=str, default="./results")
+@click.option("--cuda/--cpu", default=True)
+def demo7(image_paths, output_dir, cuda):
+    """
+    Generate Grad-CAM at different layers of ResNet-152
+    """
+    device = get_device(cuda)
+    # Synset words
+    classes = get_classtable()
+    # Model
+    #Instruction to read a model from a "xxx.ckpt" file 
+    #model = Model() # construct a new model
+    model = models.vgg16(pretrained=True) #original line to read a model from pytorch library (online)
+    model.load_state_dict(torch.load("vgg16_6Classes.ckpt"))
+    #model = torch.load("vgg16_6Classes.ckpt")
+
+    model.to(device)
+    model.eval()
+    # The ... residual layers
+    #target_layers = ["classifier.6", "classifier", "avgpool", "features", "features.30", "features.20", "features.10", "features.0"]
+    target_layers = ["avgpool", "features", "features.30", "features.20", "features.10", "features.0"]
+    target_class = 0  # "ACIDE = 0", "Brhusite = 1", "Weddellite = 2", "Whewellite = 3"?
+    # Images  
+    images, raw_images = load_images(image_paths)
+    images = torch.stack(images).to(device)
+  
+    gcam = GradCAM(model=model)
+    probs, ids = gcam.forward(images)
+    ids_ = torch.LongTensor([[target_class]] * len(images)).to(device)
+    gcam.backward(ids=ids_)
+    for target_layer in target_layers:
+        print("Generating Grad-CAM @{}".format(target_layer))
+        # Grad-CAM
+        regions = gcam.generate(target_layer=target_layer)
+        for j in range(len(images)):
+            print(
+                "\t#{}: {} ({:.5f})".format(
+                    j, classes[target_class], float(probs[ids == target_class])
+                )
+            )
+            save_gradcam(
+                filename=osp.join(
+                    output_dir,
+                    "{}-{}-gradcam-{}-{}_({:.5f}).png".format(
+                        j, "VGG16", target_layer, classes[target_class], float(probs[ids == target_class])
+                    ),
+                ),
+                gcam=regions[j, 0],
+                raw_image=raw_images[j],
+            )
 if __name__ == "__main__":
     main()
