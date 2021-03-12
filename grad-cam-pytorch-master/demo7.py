@@ -215,7 +215,7 @@ def demo7(image_paths, output_dir, cuda):
     
     target_layers = ["vgg16.avgpool","vgg16.features.28","vgg16.features.0"]
     #target_layers = ["alex.features.12", "alex.features", "alex.avgpool"]
-    classes =[0,1,2,3]   # "ACIDE = 0", "Brhusite = 1", "Weddellite = 2", "Whewellite = 3"?
+    classes =[0]#,1,2,3]   # "ACIDE = 0", "Brhusite = 1", "Weddellite = 2", "Whewellite = 3"?
     # Images  
     images, raw_images = load_images(image_paths)
     images = torch.stack(images).to(device)
@@ -238,8 +238,8 @@ def demo7(image_paths, output_dir, cuda):
                 save_gradcam(
                     filename=osp.join(
                         output_dir,
-                        "gradcamImg{}-{}-{}-Class{}_({:.5f}).png".format(
-                            j, "VGG16", target_layer, target_class, float(probs[ids == target_class])
+                        "GC-Img-{}_{}_Class-{}_({:.5f}).png".format(
+                            j, target_layer, target_class, float(probs[ids == target_class])
                         ),
                     ),
                     gcam=regions[j, 0],
