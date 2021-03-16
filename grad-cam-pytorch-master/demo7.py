@@ -32,6 +32,9 @@ import ml_kidney_stones_main.helpers.KidneyImagesLoader as kl
 import ml_kidney_stones_main.helpers.PlotHelper as kplt
 import ml_kidney_stones_main.helpers.transferLearningBaseModel as tlm
 
+import glob #to ...obtain a list of certain types of files at a dicrectory..right?
+import os 
+
 # if a model includes LSTM, such as in image captioning,
 # torch.backends.cudnn.enabled = False
 
@@ -81,10 +84,10 @@ class Vgg16Model(tlm.BaseModel):
 
 
 def get_device(cuda):
-    print("cuda is equal to:",cuda)
+    #print("cuda is equal to:",cuda)
     CudaAvailability = torch.cuda.is_available()
-    print("cuda.is_available is equal to:", CudaAvailability)
-    cuda = True   #se agrego para forzar que se use la GPU
+    #print("cuda.is_available is equal to:", CudaAvailability)
+    #cuda = True   #se agrego para forzar que se use la GPU
     #cuda = cuda and torch.cuda.is_available() #codigo original
     #cuda = torch.cuda.is_available()          #codigo modificado para seleccionar la GPU siempre que este disponible
     device = torch.device("cuda" if cuda else "cpu") #codigo Original
@@ -101,9 +104,9 @@ def get_device(cuda):
 def load_images(image_paths):
     images = []
     raw_images = []
-    print("Images:")
+    #print("Images:")
     for i, image_path in enumerate(image_paths):
-        print("\t#{}: {}".format(i, image_path))
+        #print("\t#{}: {}".format(i, image_path))
         image, raw_image = preprocess(image_path)
         images.append(image)
         raw_images.append(raw_image)
@@ -121,6 +124,14 @@ def get_classtable():
 
 
 def preprocess(image_path):
+    #try:
+    #    path=os.path.join(image_path,n)
+    #    raw_image=cv2.imread(path)
+    #    raw_image=cv2.resize(raw_image, (224,224))
+
+    #except Exception as e:
+    #    print(str(e))
+    #print("-->>>> image_path:{} <<<<------".format(image_path))
     raw_image = cv2.imread(image_path)
     raw_image = cv2.resize(raw_image, (224,) * 2)
     image = transforms.Compose(
@@ -176,14 +187,15 @@ def main(ctx):
     print("Mode:", ctx.invoked_subcommand)
     torch.cuda.empty_cache()
 
-@main.command()
-@click.option("-i", "--image-paths", type=str, multiple=True, required=True)
-#@click.option("-a", "--arch", type=click.Choice(model_names), required=True)
-@click.option("-o", "--output-dir", type=str, default="./results")
-@click.option("--cuda/--cpu", default=True)
-def demo7(image_paths, output_dir, cuda):
+#@main.command()
+#@click.option("-i", "--image-paths", type=str, multiple=True, required=True)
+#@click.option("-c", "--claseToEval", type=int, required=True)
+#@click.option("-o", "--output-dir", type=str, default="./results")
+#@click.option("--cuda/--cpu", default=True)
+def demo7(image_paths, claseToEval, output_dir, cuda):
+#def demo7(image_paths, output_dir, cuda):
     """
-    Generate Grad-CAM at different layers of ResNet-152
+    Generate Grad-CAM at different layers
     """
     device = get_device(cuda)
     # Synset words
@@ -198,55 +210,138 @@ def demo7(image_paths, output_dir, cuda):
     #Instruction to read a model from a "xxx.ckpt" file 
     #model = AlexnetModel(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None) #seed=manualSeed)   #<<<<<<<<<<<<<<<<-----<<<<----<<<---
     model = Vgg16Model(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None)
-
-    model_loaded = torch.load("vgg16_4c_combined.ckpt")
+    NameModelLoaded = "vgg16_4c_combined.ckpt"
+    model_loaded = torch.load("{}".format(NameModelLoaded))
     #print (">>>>>>>>>print of the loading the vgg16_6Classes.ckpt model <<<<<<<<<<<<")
     for l in model_loaded:
         #print(l)
         if l == "state_dict":
-            print (">>>>>>>>> Now: loading the state_dict <<<<<<<<<<<<")
+            #print (">>>>>>>>> Now: loading the state_dict <<<<<<<<<<<<")
             model.load_state_dict(model_loaded["state_dict"])
+    #print("Falta de VRAM en GPU???:")
+    #torch.cuda.empty_cache()
+    #t = torch.cuda.get_device_properties(0).total_memory
+    #print("Total     GPU-VRAM:{}".format(t))
+    #r = torch.cuda.memory_reserved(0) 
+    #a = torch.cuda.memory_allocated(0)
+    #f = r-a  # free inside reserved
+    #print("reserved  GPU-VRAM:{}".format(r))
+    #print("allocated GPU-VRAM:{}".format(a))
+    #print("before loading model, free GPU-VRAM: {}".format(f))
 
     model.to(device)
+
+    #print("xxxxxxxxxxxxxxxxxxx>>>>>>>>>>>>> Falta de VRAM en GPU???: <<<<<<<<<<<<")
+    #r = torch.cuda.memory_reserved(0) 
+    #a = torch.cuda.memory_allocated(0)
+    #f = r-a  # free inside reserved
+    #print("reserved  GPU-VRAM:{}".format(r))
+    #print("allocated GPU-VRAM:{}".format(a))
+    #print("model loaded but not evaluated, free GPU-VRAM: {}".format(f))
     model.eval()
+    #r = torch.cuda.memory_reserved(0) 
+    #a = torch.cuda.memory_allocated(0)
+    #f = r-a  # free inside reserved
+    #print("after model evaluation, free GPU-VRAM: {}".format(f))
 
     # The ... residual layers
     #target_layers = ["classifier.6", "classifier", "avgpool", "features", "features.30", "features.20", "features.10", "features.0"]
     
-    target_layers = ["vgg16.avgpool","vgg16.features.28","vgg16.features.0"]
+    #--->>>target_layers = ["vgg16.avgpool"]#,"vgg16.features.28","vgg16.features.0"]
     #target_layers = ["alex.features.12", "alex.features", "alex.avgpool"]
-    classes =[0]#,1,2,3]   # "ACIDE = 0", "Brhusite = 1", "Weddellite = 2", "Whewellite = 3"?
+    #--->>>classes =[claseToEval]#,1,2,3]   # "ACIDE = 0", "Brhusite = 1", "Weddellite = 2", "Whewellite = 3"?
+    #classes =[0,1,2,3]
     # Images  
+    #print("image_paths:{}".format(image_paths))
     images, raw_images = load_images(image_paths)
     images = torch.stack(images).to(device)
-  
+    #print(    "Images lenght: {}".format(len(images) )   )
     gcam = GradCAM(model=model)
     probs, ids = gcam.forward(images)
-    for target_class in classes:
-        ids_ = torch.LongTensor([[target_class]] * len(images)).to(device)
-        gcam.backward(ids=ids_)
-        for target_layer in target_layers:
-            print("Generating Grad-CAM @{}".format(target_layer))
+    #for target_class in classes:
+    ids_ = torch.LongTensor([[                 claseToEval]] * len(images)).to(device)    #target_class]] * len(images)).to(device)
+    gcam.backward(ids=ids_)
+    #    for target_layer in target_layers:
+    #print("Generating Grad-CAM @{}".format(target_layer))
+    #print("Generating Grad-CAM vgg16.avgpool")
             # Grad-CAM
-            regions = gcam.generate(target_layer=target_layer)
-            for j in range(len(images)):
+    regions = gcam.generate(target_layer=       "vgg16.avgpool") #target_layer)
+    #        for j in range(len(images)):
                 #print(
                 #    "\t#{}: {} ({:.5f})".format(
                 #        j, target_class, float(probs[ids == target_class])
                 #    )
                 #)
-                save_gradcam(
-                    filename=osp.join(
-                        output_dir,
-                        "GC-Img-{}_{}_Class-{}_({:.5f}).png".format(
-                            j, target_layer, target_class, float(probs[ids == target_class])
-                        ),
-                    ),
-                    gcam=regions[j, 0],
-                    raw_image=raw_images[j],
-                )
+    save_gradcam(
+        filename=osp.join(
+            output_dir,
+            #"{}_{}_Class-{}_({:.5f}).png".format(
+            "{}_avgpool_Class{}_({:.5f}).png".format(
+                #NameModelLoaded, target_layer, target_class, float(probs[ids == target_class])
+                NameModelLoaded, claseToEval, float(probs[ids == claseToEval])
+            ),
+        ),
+        #gcam=regions[j, 0],
+        gcam=regions[0, 0],
+        #raw_image=raw_images[j],
+        raw_image=raw_images[0],
+    )
+    gcam.remove_hook()
+    #del gcam
+    #del model
+    #del model_loaded
+    #del images
+    #del raw_images
+    #del probs
+    #del ids
+    #del ids_
+    #del regions
+    #with torch.no_grad():
+    #    torch.cuda.empty_cache()
     torch.cuda.empty_cache()
+    #print("          -------->>><<<<-----------")
+    #print("----------      Fin de Demo7        ")
+    #print("          -------->>><<<<-----------")
+
+
+@main.command()
+#@click.option("-i", "--image-paths", type=str, multiple=True, required=True)
+#@click.option("-c", "--claseToEval", required=True)
+#@click.option("-o", "--output-dir", type=str, default="./results")
+#@click.option("--cuda/--cpu", default=True)
+def demo8():
+    print("Demo8 running")
+    for filename in glob.glob('samples/*.png'):
+        print("----------xxxxxxxxxxxxxxx-----------:")
+        for claseToEval in range(4):
+            #claseToEval = claseToEval+1
+            #t = torch.cuda.get_device_properties(0).total_memory
+            #print("Total     GPU-VRAM:{}".format(t))
+            #r = torch.cuda.memory_reserved(0) 
+            #a = torch.cuda.memory_allocated(0)
+            #f = r-a  # free inside reserved
+            #print("BEFORE demo7 free GPU-VRAM: {}".format(f))
+            #print("reserved  GPU-VRAM:{}".format(r))
+            #print("allocated GPU-VRAM:{}".format(a))
+            #print( "Class:{}".format(claseToEval) )
+            dir = [filename]
+            demo7(dir, claseToEval, output_dir="./results", cuda=True)
+            torch.cuda.empty_cache()
+            #r = torch.cuda.memory_reserved(0) 
+            #a = torch.cuda.memory_allocated(0)
+            #f = r-a  # free inside reserved
+            #print("after demo7 free GPU-VRAM: {}".format(f))
+            #print("reserved  GPU-VRAM:{}".format(r))
+            #print("allocated GPU-VRAM:{}".format(a))
+            
+            print("filename:{} Class:{}".format(filename, claseToEval))
+            #demo7("{}".format(filename), claseToEval, output_dir="./results", cuda=True)
+        #print("filename:{} ".format(filename))
+        #dir = [filename]
+        #demo7(dir, output_dir="./results", cuda=True)
+        #torch.cuda.empty_cache()
 
 if __name__ == "__main__":
+    torch.cuda.empty_cache()
     main()
     torch.cuda.empty_cache()
