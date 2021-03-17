@@ -209,7 +209,9 @@ def demo7(image_paths, claseToEval, output_dir, cuda):
     # Model
     #Instruction to read a model from a "xxx.ckpt" file 
     #model = AlexnetModel(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None) #seed=manualSeed)   #<<<<<<<<<<<<<<<<-----<<<<----<<<---
-    model = Vgg16Model(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None)
+    #model = Vgg16Model(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None)
+    model = Vgg16Model(hparams={}, num_classes=4, pretrained=False, seed=None)
+
     NameModelLoaded = "vgg16_4c_combined.ckpt"
     model_loaded = torch.load("{}".format(NameModelLoaded))
     #print (">>>>>>>>>print of the loading the vgg16_6Classes.ckpt model <<<<<<<<<<<<")
@@ -364,6 +366,7 @@ def demo9(image_path, output_dir, cuda):
     #Instruction to read a model from a "xxx.ckpt" file 
     #model = AlexnetModel(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None) #seed=manualSeed)   #<<<<<<<<<<<<<<<<-----<<<<----<<<---
     model = Vgg16Model(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None)
+    #model = Vgg16Model(hparams={}, num_classes=4, pretrained=False, seed=None)
     NameModelLoaded = "vgg16_4c_combined.ckpt"
     model_loaded = torch.load("{}".format(NameModelLoaded))
     #print (">>>>>>>>>print of the loading the vgg16_6Classes.ckpt model <<<<<<<<<<<<")
