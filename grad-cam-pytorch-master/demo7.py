@@ -341,6 +341,115 @@ def demo8():
         #demo7(dir, output_dir="./results", cuda=True)
         #torch.cuda.empty_cache()
 
+@main.command()
+@click.option("-i", "--image-path", type=str, multiple=True, required=True)
+#@click.option("-c", "--claseToEval", type=int, required=True)
+@click.option("-o", "--output-dir", type=str, default="./results")
+@click.option("--cuda/--cpu", default=True)
+def demo9(image_path, output_dir, cuda):
+#def demo7(image_paths, output_dir, cuda):
+    """
+    Generate Grad-CAM at different layers
+    """
+    device = get_device(cuda)
+    # Synset words
+    #classes = get_classtable()
+
+    #model = Model() # construct a new model
+    #model = models.vgg16()
+    #model = models.vgg16(pretrained=True) #original line to read a model from pytorch library (online)
+    #model = torch.nn.DataParallel(model)
+
+    # Model
+    #Instruction to read a model from a "xxx.ckpt" file 
+    #model = AlexnetModel(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None) #seed=manualSeed)   #<<<<<<<<<<<<<<<<-----<<<<----<<<---
+    model = Vgg16Model(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None)
+    NameModelLoaded = "vgg16_4c_combined.ckpt"
+    model_loaded = torch.load("{}".format(NameModelLoaded))
+    #print (">>>>>>>>>print of the loading the vgg16_6Classes.ckpt model <<<<<<<<<<<<")
+    for l in model_loaded:
+        #print(l)
+        if l == "state_dict":
+            #print (">>>>>>>>> Now: loading the state_dict <<<<<<<<<<<<")
+            model.load_state_dict(model_loaded["state_dict"])
+    #print("Falta de VRAM en GPU???:")
+    #torch.cuda.empty_cache()
+    #t = torch.cuda.get_device_properties(0).total_memory
+    #print("Total     GPU-VRAM:{}".format(t))
+    #r = torch.cuda.memory_reserved(0) 
+    #a = torch.cuda.memory_allocated(0)
+    #f = r-a  # free inside reserved
+    #print("reserved  GPU-VRAM:{}".format(r))
+    #print("allocated GPU-VRAM:{}".format(a))
+    #print("before loading model, free GPU-VRAM: {}".format(f))
+
+    model.to(device)
+
+    #print("xxxxxxxxxxxxxxxxxxx>>>>>>>>>>>>> Falta de VRAM en GPU???: <<<<<<<<<<<<")
+    #r = torch.cuda.memory_reserved(0) 
+    #a = torch.cuda.memory_allocated(0)
+    #f = r-a  # free inside reserved
+    #print("reserved  GPU-VRAM:{}".format(r))
+    #print("allocated GPU-VRAM:{}".format(a))
+    #print("model loaded but not evaluated, free GPU-VRAM: {}".format(f))
+    model.eval()
+    #r = torch.cuda.memory_reserved(0) 
+    #a = torch.cuda.memory_allocated(0)
+    #f = r-a  # free inside reserved
+    #print("after model evaluation, free GPU-VRAM: {}".format(f))
+
+    # The ... residual layers
+    #target_layers = ["classifier.6", "classifier", "avgpool", "features", "features.30", "features.20", "features.10", "features.0"]
+    
+    #--->>>target_layers = ["vgg16.avgpool"]#,"vgg16.features.28","vgg16.features.0"]
+    #target_layers = ["alex.features.12", "alex.features", "alex.avgpool"]
+    #--->>>classes =[claseToEval]#,1,2,3]   # "ACIDE = 0", "Brhusite = 1", "Weddellite = 2", "Whewellite = 3"?
+    #classes =[0,1,2,3]
+    classes = 3
+    # Images  
+    #print("image_paths:{}".format(image_paths))
+    images, raw_images = load_images(image_path)
+    Img_name = image_path[0].split("\\")
+    Img_name = Img_name[2].split(".")[0]
+    #print(Img_name)
+    images = torch.stack(images).to(device)
+    #print(    "Images lenght: {}".format(len(images) )   )
+    gcam = GradCAM(model=model)
+    probs, ids = gcam.forward(images)
+    #for target_class in classes:
+    ids_ = torch.LongTensor([[classes]] * len(images)).to(device)    #target_class]] * len(images)).to(device)
+    gcam.backward(ids=ids_)
+    #    for target_layer in target_layers:
+    #print("Generating Grad-CAM @{}".format(target_layer))
+    #print("Generating Grad-CAM vgg16.avgpool")
+            # Grad-CAM
+    regions = gcam.generate(target_layer=       "vgg16.avgpool") #target_layer)
+    #        for j in range(len(images)):
+                #print(
+                #    "\t#{}: {} ({:.5f})".format(
+                #        j, target_class, float(probs[ids == target_class])
+                #    )
+                #)
+    save_gradcam(
+        filename=osp.join(
+            output_dir,
+            #"{}_{}_Class-{}_({:.5f}).png".format(
+            "{}_last-avgpool_Class{}_({:.5f})_{}.png".format(
+                #NameModelLoaded, target_layer, target_class, float(probs[ids == target_class])
+                NameModelLoaded, classes, float(probs[ids == classes]), Img_name
+            ),
+        ),
+        #gcam=regions[j, 0],
+        gcam=regions[0, 0],
+        #raw_image=raw_images[j],
+        raw_image=raw_images[0],
+    )
+    gcam.remove_hook()
+    torch.cuda.empty_cache()
+    #print("          -------->>><<<<-----------")
+    #print("----------      Fin de Demo9        ")
+    #print("          -------->>><<<<-----------")
+
 if __name__ == "__main__":
     torch.cuda.empty_cache()
     main()
