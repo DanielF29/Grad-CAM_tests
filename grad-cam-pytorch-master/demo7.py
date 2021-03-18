@@ -28,59 +28,18 @@ from grad_cam import (
 
 #import pytorch_lightning as pl
 #import ml_kidney_stones_main.helpers.transferLearningBaseModel as tlm
-import ml_kidney_stones_main.helpers.KidneyImagesLoader as kl
-import ml_kidney_stones_main.helpers.PlotHelper as kplt
-import ml_kidney_stones_main.helpers.transferLearningBaseModel as tlm
+#import ml_kidney_stones_main.helpers.KidneyImagesLoader as kl
+#import ml_kidney_stones_main.helpers.PlotHelper as kplt
+#import ml_kidney_stones_main.helpers.transferLearningBaseModel as tlm
 
 import glob #to ...obtain a list of certain types of files at a dicrectory..right?
 import os 
+import pytorch_lightning as pl
 
 # if a model includes LSTM, such as in image captioning,
 # torch.backends.cudnn.enabled = False
 
-class AlexnetModel(tlm.BaseModel):
-  def __init__(self, hparams={}, num_classes=6, batch_size=64, pretrained=False, seed=None):
-    if "lr" not in hparams:
-      hparams["lr"] = 0.001
 
-    #LOG INFO
-    hparams["num_classes"] = num_classes
-    hparams["batch_size"] = batch_size
-    hparams["is_pretrained"] = pretrained
-    super(AlexnetModel, self).__init__(hparams, seed=seed)
-    
-    self.alex = models.alexnet(pretrained=pretrained)
-    # complete FC layer.
-    self.alex.classifier = torch.nn.Sequential(torch.nn.Dropout(p=0.5), torch.nn.Linear(9216, 4096), torch.nn.ReLU(), torch.nn.Dropout(p=0.5), torch.nn.Linear(4096, 256), torch.nn.ReLU(), torch.nn.Linear(256, num_classes))
-    # Alternate FC layer to output the features of the image instead of of the probability of belonging go a class. The output
-    # contains 256 features.
-
-    #self.alex.classifier = nn.Sequential(nn.Dropout(p=0.5), nn.Linear(9216, 4096), nn.ReLU(), nn.Dropout(p=0.5), nn.Linear(4096, 256), nn.ReLU())
-    #self.alex.classifier_2 = nn.Sequential(nn.Linear(256, num_classes+1)) # still trying to find out why it works with +1
-    self.batch_size = batch_size
-    self.loss_fn = torch.nn.CrossEntropyLoss()
-
-  def forward(self, x):
-    return self.alex(x)
-
-class Vgg16Model(tlm.BaseModel):
-  def __init__(self, hparams={}, num_classes=6, batch_size=64, pretrained=False, seed=None):
-    if "lr" not in hparams:
-      hparams["lr"] = 0.001
-
-    #LOG INFO
-    hparams["num_classes"] = num_classes
-    hparams["batch_size"] = batch_size
-    hparams["is_pretrained"] = pretrained
-    super(Vgg16Model, self).__init__(hparams, seed=seed)
-    
-    self.vgg16 = models.vgg16(pretrained=pretrained)
-    self.vgg16.classifier = torch.nn.Sequential(torch.nn.Linear(25088, 4096), torch.nn.ReLU(), torch.nn.Dropout(p=0.5), torch.nn.Linear(4096, 256), torch.nn.ReLU(), torch.nn.Dropout(p=0.5), torch.nn.Linear(256, num_classes))
-    self.batch_size = batch_size
-    self.loss_fn = torch.nn.CrossEntropyLoss()
-
-  def forward(self, x):
-    return self.vgg16(x)
 
 
 def get_device(cuda):
@@ -210,16 +169,24 @@ def demo7(image_paths, claseToEval, output_dir, cuda):
     #Instruction to read a model from a "xxx.ckpt" file 
     #model = AlexnetModel(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None) #seed=manualSeed)   #<<<<<<<<<<<<<<<<-----<<<<----<<<---
     #model = Vgg16Model(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None)
-    model = Vgg16Model(hparams={}, num_classes=4, pretrained=False, seed=None)
-
+    #model = Vgg16Model(hparams={}, num_classes=4, pretrained=False, seed=None)
+    num_classes=4
+    model = models.vgg16()
+    model.classifier = torch.nn.Sequential(torch.nn.Linear(25088, 4096), torch.nn.ReLU(), torch.nn.Dropout(p=0.5), torch.nn.Linear(4096, 256), torch.nn.ReLU(), torch.nn.Dropout(p=0.5), torch.nn.Linear(256, num_classes))
     NameModelLoaded = "vgg16_4c_combined.ckpt"
     model_loaded = torch.load("{}".format(NameModelLoaded))
     #print (">>>>>>>>>print of the loading the vgg16_6Classes.ckpt model <<<<<<<<<<<<")
     for l in model_loaded:
         #print(l)
         if l == "state_dict":
+            corrected_dict = {}
+            for layerName in model_loaded["state_dict"]:
+                NewLayerName = layerName.split(".", 1)[1]
+                #print(NewLayerName)
+                corrected_dict[NewLayerName] = model_loaded["state_dict"][layerName]
             #print (">>>>>>>>> Now: loading the state_dict <<<<<<<<<<<<")
-            model.load_state_dict(model_loaded["state_dict"])
+            #print(corrected_dict)
+            model.load_state_dict(corrected_dict)
     #print("Falta de VRAM en GPU???:")
     #torch.cuda.empty_cache()
     #t = torch.cuda.get_device_properties(0).total_memory
@@ -230,7 +197,7 @@ def demo7(image_paths, claseToEval, output_dir, cuda):
     #print("reserved  GPU-VRAM:{}".format(r))
     #print("allocated GPU-VRAM:{}".format(a))
     #print("before loading model, free GPU-VRAM: {}".format(f))
-
+    
     model.to(device)
 
     #print("xxxxxxxxxxxxxxxxxxx>>>>>>>>>>>>> Falta de VRAM en GPU???: <<<<<<<<<<<<")
@@ -267,7 +234,9 @@ def demo7(image_paths, claseToEval, output_dir, cuda):
     #print("Generating Grad-CAM @{}".format(target_layer))
     #print("Generating Grad-CAM vgg16.avgpool")
             # Grad-CAM
-    regions = gcam.generate(target_layer=       "vgg16.avgpool") #target_layer)
+    #target_layer = "vgg16.avgpool"
+    target_layer = "avgpool"
+    regions = gcam.generate(target_layer= target_layer)  
     #        for j in range(len(images)):
                 #print(
                 #    "\t#{}: {} ({:.5f})".format(
