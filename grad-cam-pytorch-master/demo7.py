@@ -158,14 +158,16 @@ def demo0(images_folder_path, output_dir, cuda):
     #--->>>target_layers = ["vgg16.avgpool"]#,"vgg16.features.28","vgg16.features.0"]
     #target_layers = ["alex.features.12", "alex.features", "alex.avgpool"]
     #--->>>classes =[claseToEval]#,1,2,3]   # "ACIDE = 0", "Brhusite = 1", "Weddellite = 2", "Whewellite = 3"?
-    folderPath = '{}/*.png'.format(images_folder_path)
-    print(folderPath)
+    #folderPath = '{}/*.png'.format(images_folder_path)
+    #print(folderPath)
     for filename in glob.glob('{}/*.png'.format(images_folder_path)):
-        #print("ImgName: {}, ImgType:{}".format(image_paths, type(image_paths))  )
+        print("ImgName: {}, ImgType:{}".format(images_folder_path, type(images_folder_path))  )
         #Image_Name = images_folder_path[0].split("\\")[-1]
-        Image_Name = images_folder_path.split("\\")[-1]
-        Image_Name = Image_Name.split(".")[0]
-        #print("CutImgName: {}, CutImgType:{}".format(Image_Name, type(Image_Name))  )
+        #Image_Name = filename.split("/")[-1]
+        Image_Name = filename.split("\\")[-1]
+        Image_Name = Image_Name.split(".",1)[0]
+        print("File_Name: {}".format(filename) )
+        print("CutImgName: {}, CutImgType:{}".format(Image_Name, type(Image_Name))  )
         dir = [filename]
         # Images  
         #print("image_paths:{}".format(image_paths))
@@ -193,7 +195,7 @@ def demo0(images_folder_path, output_dir, cuda):
                     filename=osp.join(
                         output_dir,
                         #"{}_{}_Class-{}_({:.5f}).png".format(
-                        "VGG16_avgpool-{}-Class{}({:.5f}).png".format(
+                        "VGG16-avgpool--{}--C{}({:.5f}).png".format(
                             Image_Name, claseToEval, float(probs[ids == claseToEval])
                         ),
                     ),
