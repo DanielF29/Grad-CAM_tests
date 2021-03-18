@@ -26,25 +26,15 @@ from grad_cam import (
     occlusion_sensitivity,
 )
 
-#import pytorch_lightning as pl
-#import ml_kidney_stones_main.helpers.transferLearningBaseModel as tlm
-#import ml_kidney_stones_main.helpers.KidneyImagesLoader as kl
-#import ml_kidney_stones_main.helpers.PlotHelper as kplt
-#import ml_kidney_stones_main.helpers.transferLearningBaseModel as tlm
-
 import glob #to ...obtain a list of certain types of files at a dicrectory..right?
 import os 
-import pytorch_lightning as pl
 
 # if a model includes LSTM, such as in image captioning,
 # torch.backends.cudnn.enabled = False
 
-
-
-
 def get_device(cuda):
     #print("cuda is equal to:",cuda)
-    CudaAvailability = torch.cuda.is_available()
+    #CudaAvailability = torch.cuda.is_available()
     #print("cuda.is_available is equal to:", CudaAvailability)
     #cuda = True   #se agrego para forzar que se use la GPU
     #cuda = cuda and torch.cuda.is_available() #codigo original
@@ -59,7 +49,6 @@ def get_device(cuda):
         print("Device:", torch.cuda.get_device_name(current_device)) #para forzar que imprima el divice usado
     return device
 
-
 def load_images(image_paths):
     images = []
     raw_images = []
@@ -70,17 +59,6 @@ def load_images(image_paths):
         images.append(image)
         raw_images.append(raw_image)
     return images, raw_images
-
-
-def get_classtable():
-    classes = []
-    with open("samples/synset_words.txt") as lines:
-        for line in lines:
-            line = line.strip().split(" ", 1)[1]
-            line = line.split(", ", 1)[0].replace(" ", "_")
-            classes.append(line)
-    return classes
-
 
 def preprocess(image_path):
     #try:
@@ -101,14 +79,12 @@ def preprocess(image_path):
     )(raw_image[..., ::-1].copy())
     return image, raw_image
 
-
 def save_gradient(filename, gradient):
     gradient = gradient.cpu().numpy().transpose(1, 2, 0)
     gradient -= gradient.min()
     gradient /= gradient.max()
     gradient *= 255.0
     cv2.imwrite(filename, np.uint8(gradient))
-
 
 def save_gradcam(filename, gcam, raw_image, paper_cmap=False):
     gcam = gcam.cpu().numpy()
@@ -120,7 +96,6 @@ def save_gradcam(filename, gcam, raw_image, paper_cmap=False):
         gcam = (cmap.astype(np.float) + raw_image.astype(np.float)) / 2
     cv2.imwrite(filename, np.uint8(gcam))
 
-
 def save_sensitivity(filename, maps):
     maps = maps.cpu().numpy()
     scale = max(maps[maps > 0].max(), -maps[maps <= 0].min())
@@ -131,20 +106,122 @@ def save_sensitivity(filename, maps):
     maps = cv2.resize(maps, (224, 224), interpolation=cv2.INTER_NEAREST)
     cv2.imwrite(filename, maps)
 
-
-# torchvision models
-model_names = sorted(
-    name
-    for name in models.__dict__
-    if name.islower() and not name.startswith("__") and callable(models.__dict__[name])
-)
-
-
 @click.group()
 @click.pass_context
 def main(ctx):
     print("Mode:", ctx.invoked_subcommand)
+    #torch.cuda.empty_cache()
+
+@main.command()
+#@click.option("-i", "--images_folder_path", type=str, multiple=True, required=True)
+@click.option("-i", "--images_folder_path", type=str, required=True)
+#@click.option("-c", "--claseToEval", type=int, required=True)
+@click.option("-o", "--output-dir", type=str, default="./results")
+@click.option("--cuda/--cpu", default=True)
+#def demo0(image_paths, claseToEval, output_dir, cuda):
+def demo0(images_folder_path, output_dir, cuda):
+    print("Demo-0 running")
+    device = get_device(cuda)
+    num_classes=4
+    targeted_layers = ["avgpool"]
+    # Model
+    #Instruction to read a model from a "xxx.ckpt" file 
+    #model = AlexnetModel(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None) #seed=manualSeed)   #<<<<<<<<<<<<<<<<-----<<<<----<<<---
+    #model = Vgg16Model(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None)
+    #model = Vgg16Model(hparams={}, num_classes=4, pretrained=False, seed=None)
+    model = models.vgg16()
+    model.classifier = torch.nn.Sequential(torch.nn.Linear(25088, 4096), torch.nn.ReLU(), torch.nn.Dropout(p=0.5), torch.nn.Linear(4096, 256), torch.nn.ReLU(), torch.nn.Dropout(p=0.5), torch.nn.Linear(256, num_classes))
+    NameModelLoaded = "vgg16_4c_combined.ckpt"
+    model_loaded = torch.load("{}".format(NameModelLoaded))
+    #print (">>>>>>>>>print of the loading the vgg16_6Classes.ckpt model <<<<<<<<<<<<")
+    for l in model_loaded:
+        #print(l)
+        if l == "state_dict":
+            corrected_dict = {}
+            for layerName in model_loaded["state_dict"]:
+                NewLayerName = layerName.split(".", 1)[1]
+                #print(NewLayerName)
+                corrected_dict[NewLayerName] = model_loaded["state_dict"][layerName]
+            print (">>>>>>>>> Loading the state_dict of {} <<<<<<<<<<<<".format(NameModelLoaded))
+            #print(corrected_dict)
+            model.load_state_dict(corrected_dict)
+    del model_loaded
+    del corrected_dict
+    del layerName
+    del NewLayerName
+    del NameModelLoaded
+
+    model.to(device)
+    model.eval()
+    # The ... residual layers
+    #target_layers = ["classifier.6", "classifier", "avgpool", "features", "features.30", "features.20", "features.10", "features.0"]
+    #--->>>target_layers = ["vgg16.avgpool"]#,"vgg16.features.28","vgg16.features.0"]
+    #target_layers = ["alex.features.12", "alex.features", "alex.avgpool"]
+    #--->>>classes =[claseToEval]#,1,2,3]   # "ACIDE = 0", "Brhusite = 1", "Weddellite = 2", "Whewellite = 3"?
+    folderPath = '{}/*.png'.format(images_folder_path)
+    print(folderPath)
+    for filename in glob.glob('{}/*.png'.format(images_folder_path)):
+        #print("ImgName: {}, ImgType:{}".format(image_paths, type(image_paths))  )
+        #Image_Name = images_folder_path[0].split("\\")[-1]
+        Image_Name = images_folder_path.split("\\")[-1]
+        Image_Name = Image_Name.split(".")[0]
+        #print("CutImgName: {}, CutImgType:{}".format(Image_Name, type(Image_Name))  )
+        dir = [filename]
+        # Images  
+        #print("image_paths:{}".format(image_paths))
+        images, raw_images = load_images(dir)
+        images = torch.stack(images).to(device)
+        #print(    "Images lenght: {}".format(len(images) )   )
+        gcam = GradCAM(model=model)#, target_layer= targeted_layers) #Suponiendo que se retendran menos "hooks"
+        probs, ids = gcam.forward(images)
+        for claseToEval in range(4):
+            #claseToEval = claseToEval+1
+            #print( "Class:{}".format(claseToEval) )
+            for target_layer in targeted_layers:
+                #for target_class in classes:
+                ids_ = torch.LongTensor([[claseToEval]] * len(images)).to(device)    #target_class]] * len(images)).to(device)
+                gcam.backward(ids=ids_)
+                #    for target_layer in target_layers:
+                #print("Generating Grad-CAM @{}".format(target_layer))
+                #print("Generating Grad-CAM vgg16.avgpool")
+                # Grad-CAM
+                #target_layer = "vgg16.avgpool"
+
+                regions = gcam.generate(target_layer= target_layer)  
+                #        for j in range(len(images)):
+                save_gradcam(
+                    filename=osp.join(
+                        output_dir,
+                        #"{}_{}_Class-{}_({:.5f}).png".format(
+                        "VGG16_avgpool-{}-Class{}({:.5f}).png".format(
+                            Image_Name, claseToEval, float(probs[ids == claseToEval])
+                        ),
+                    ),
+                    #gcam=regions[j, 0],
+                    gcam=regions[0, 0],
+                    #raw_image=raw_images[j],
+                    raw_image=raw_images[0],
+                )
+            #del gcam.backward(ids=ids_)
+        gcam.remove_hook()
+        del gcam
+        del images
+        del raw_images
+        del probs
+        del ids
+        del ids_
+        del regions
+    ##############################
+    #End of 3 FORs   #############
+    ##############################
+    del model
+    #with torch.no_grad():
+    #    torch.cuda.empty_cache()
     torch.cuda.empty_cache()
+    #print("          -------->>><<<<-----------")
+    #print("----------      Fin de Demo0        ")
+    #print("          -------->>><<<<-----------")
+
 
 #@main.command()
 #@click.option("-i", "--image-paths", type=str, multiple=True, required=True)
@@ -153,17 +230,11 @@ def main(ctx):
 #@click.option("--cuda/--cpu", default=True)
 def demo7(image_paths, claseToEval, output_dir, cuda):
 #def demo7(image_paths, output_dir, cuda):
-    """
-    Generate Grad-CAM at different layers
-    """
     device = get_device(cuda)
-    # Synset words
-    #classes = get_classtable()
-
-    #model = Model() # construct a new model
-    #model = models.vgg16()
-    #model = models.vgg16(pretrained=True) #original line to read a model from pytorch library (online)
-    #model = torch.nn.DataParallel(model)
+    #print("ImgName: {}, ImgType:{}".format(image_paths, type(image_paths))  )
+    Image_Name = image_paths[0].split("\\")[-1]
+    Image_Name = Image_Name.split(".")[0]
+    #print("CutImgName: {}, CutImgType:{}".format(Image_Name, type(Image_Name))  )
 
     # Model
     #Instruction to read a model from a "xxx.ckpt" file 
@@ -187,6 +258,11 @@ def demo7(image_paths, claseToEval, output_dir, cuda):
             #print (">>>>>>>>> Now: loading the state_dict <<<<<<<<<<<<")
             #print(corrected_dict)
             model.load_state_dict(corrected_dict)
+    del model_loaded
+    del corrected_dict
+    del layerName
+    del NewLayerName
+    del NameModelLoaded
     #print("Falta de VRAM en GPU???:")
     #torch.cuda.empty_cache()
     #t = torch.cuda.get_device_properties(0).total_memory
@@ -197,9 +273,7 @@ def demo7(image_paths, claseToEval, output_dir, cuda):
     #print("reserved  GPU-VRAM:{}".format(r))
     #print("allocated GPU-VRAM:{}".format(a))
     #print("before loading model, free GPU-VRAM: {}".format(f))
-    
     model.to(device)
-
     #print("xxxxxxxxxxxxxxxxxxx>>>>>>>>>>>>> Falta de VRAM en GPU???: <<<<<<<<<<<<")
     #r = torch.cuda.memory_reserved(0) 
     #a = torch.cuda.memory_allocated(0)
@@ -247,9 +321,9 @@ def demo7(image_paths, claseToEval, output_dir, cuda):
         filename=osp.join(
             output_dir,
             #"{}_{}_Class-{}_({:.5f}).png".format(
-            "{}_avgpool_Class{}_({:.5f}).png".format(
+            "VGG16_avgpool-{}-Class{}({:.5f}).png".format(
                 #NameModelLoaded, target_layer, target_class, float(probs[ids == target_class])
-                NameModelLoaded, claseToEval, float(probs[ids == claseToEval])
+                Image_Name, claseToEval, float(probs[ids == claseToEval])
             ),
         ),
         #gcam=regions[j, 0],
@@ -258,8 +332,8 @@ def demo7(image_paths, claseToEval, output_dir, cuda):
         raw_image=raw_images[0],
     )
     gcam.remove_hook()
-    #del gcam
-    #del model
+    del gcam
+    del model
     #del model_loaded
     #del images
     #del raw_images
@@ -323,8 +397,6 @@ def demo9(image_path, output_dir, cuda):
     Generate Grad-CAM at different layers
     """
     device = get_device(cuda)
-    # Synset words
-    #classes = get_classtable()
 
     #model = Model() # construct a new model
     #model = models.vgg16()
