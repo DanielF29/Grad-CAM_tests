@@ -121,6 +121,18 @@ def main(ctx):
 #def demo0(image_paths, claseToEval, output_dir, cuda):
 def demo0(images_folder_path, output_dir, cuda):
     print("Demo-0 running")
+    t = torch.cuda.get_device_properties(0).total_memory
+    t = t/1000000
+    print("--> Total GPU-VRAM:{}".format( t ))
+
+    r = torch.cuda.memory_reserved(0) 
+    r = (r/1000000)
+    a = torch.cuda.memory_allocated(0)
+    a = (a/1000000)
+    f = r-a  # free inside reserved
+    print("Reserved:{} - Allocated:{} = {}".format(r, a, f ))
+    print("Total(4GB) - Reserved: {}".format( (t-r) ))
+
     device = get_device(cuda)
     num_classes=4
     targeted_layers = ["avgpool"]
@@ -160,14 +172,28 @@ def demo0(images_folder_path, output_dir, cuda):
     #--->>>classes =[claseToEval]#,1,2,3]   # "ACIDE = 0", "Brhusite = 1", "Weddellite = 2", "Whewellite = 3"?
     #folderPath = '{}/*.png'.format(images_folder_path)
     #print(folderPath)
+    r = torch.cuda.memory_reserved(0) 
+    r = (r/1000000)
+    a = torch.cuda.memory_allocated(0)
+    a = (a/1000000)
+    f = r-a  # free inside reserved
+    print("------<<<<<------<<<<<-----Before FORs----->>>>>-------->>>>>------")
+    print("Reserved:{} - Allocated:{} = {}".format(r, a, f ))
+    print("Total(4GB) - Reserved: {}".format( (t-r)   ))
+    print(" ")
+    prevFree_GPUram = f 
+
     for filename in glob.glob('{}/*.png'.format(images_folder_path)):
-        print("ImgName: {}, ImgType:{}".format(images_folder_path, type(images_folder_path))  )
+        #print("ImgName: {}, ImgType:{}".format(images_folder_path, type(images_folder_path))  )
         #Image_Name = images_folder_path[0].split("\\")[-1]
         #Image_Name = filename.split("/")[-1]
         Image_Name = filename.split("\\")[-1]
+        Image_Name = Image_Name.split("/")[-1]
         Image_Name = Image_Name.split(".",1)[0]
-        print("File_Name: {}".format(filename) )
-        print("CutImgName: {}, CutImgType:{}".format(Image_Name, type(Image_Name))  )
+        #print("File_Name: {}".format(filename) )
+        #print("CutImgName: {}, CutImgType:{}".format(Image_Name, type(Image_Name))  )
+        print("{}".format(Image_Name))
+        #print(" ")
         dir = [filename]
         # Images  
         #print("image_paths:{}".format(image_paths))
@@ -205,6 +231,18 @@ def demo0(images_folder_path, output_dir, cuda):
                     raw_image=raw_images[0],
                 )
             #del gcam.backward(ids=ids_)
+        r = torch.cuda.memory_reserved(0) 
+        r = (r/1000000)
+        a = torch.cuda.memory_allocated(0)
+        a = (a/1000000)
+        f = r-a  # free inside reserved
+        print("reduction on Free_GPUram: {}".format( (prevFree_GPUram - f) ))
+        print("------<<<<<------<<<<<-----XXX----->>>>>-------->>>>>------")
+        print("FREE: Reserved:{} - Allocated:{} = {}".format(r, a, f ))
+        print("Total(4GB) - Reserved: {}".format( t -r ))
+        prevFree_GPUram = f
+        """
+        #Borrado de variables del ultimo ciclo "For"
         gcam.remove_hook()
         del gcam
         del images
@@ -213,6 +251,19 @@ def demo0(images_folder_path, output_dir, cuda):
         del ids
         del ids_
         del regions
+        r = torch.cuda.memory_reserved(0) 
+        a = torch.cuda.memory_allocated(0)
+        f = r-a  # free inside reserved
+        print("-------------------------------------")
+        print("reduction on Free_GPUram: {}".format( (prevFree_GPUram-f)/1000000 ))
+        print("Reserved:{}".format(  (r/1000000)   ))
+        print("Allocated:{}".format( (a/1000000)   ))
+        print("Total - Reserved:{}".format(  (t-r)/1000000  ))
+        print("Reserved - Allocated: {}".format( (f/1000000)   ))
+        print("------<<<<<------<<<<<-----XXX----->>>>>-------->>>>>------")
+        prevFree_GPUram = f
+        # """
+        print(" ")
     ##############################
     #End of 3 FORs   #############
     ##############################
@@ -220,9 +271,9 @@ def demo0(images_folder_path, output_dir, cuda):
     #with torch.no_grad():
     #    torch.cuda.empty_cache()
     torch.cuda.empty_cache()
-    #print("          -------->>><<<<-----------")
-    #print("----------      Fin de Demo0        ")
-    #print("          -------->>><<<<-----------")
+    print("          -------->>><<<<-----------")
+    print("----------      Fin de Demo0        ")
+    print("          -------->>><<<<-----------")
 
 
 #@main.command()
@@ -352,10 +403,6 @@ def demo7(image_paths, claseToEval, output_dir, cuda):
 
 
 @main.command()
-#@click.option("-i", "--image-paths", type=str, multiple=True, required=True)
-#@click.option("-c", "--claseToEval", required=True)
-#@click.option("-o", "--output-dir", type=str, default="./results")
-#@click.option("--cuda/--cpu", default=True)
 def demo8():
     print("Demo8 running")
     for filename in glob.glob('samples/*.png'):
@@ -497,6 +544,7 @@ def demo9(image_path, output_dir, cuda):
     #print("          -------->>><<<<-----------")
 
 if __name__ == "__main__":
+    
     torch.cuda.empty_cache()
     main()
     torch.cuda.empty_cache()
