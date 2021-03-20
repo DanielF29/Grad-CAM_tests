@@ -95,7 +95,9 @@ def save_gradcam(filename, gcam, raw_image, paper_cmap=False):
     cmap = cm.jet_r(gcam)[..., :3] * 255.0
     if paper_cmap:
         alpha = gcam[..., None]
-        gcam = alpha * cmap + (1 - alpha) * raw_image
+        #alpha = alpha * 0.5
+        reductionFactor = 0.5
+        gcam=(alpha*reductionFactor)* cmap+(1-(alpha*(1-reductionFactor) ))*raw_image
     else:
         gcam = (cmap.astype(np.float) + raw_image.astype(np.float)) / 2
     cv2.imwrite(filename, np.uint8(gcam))
