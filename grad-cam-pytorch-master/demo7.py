@@ -128,15 +128,17 @@ def demo0(images_folder_path, output_dir, cuda):
     MegaBites= 1024*1024
     t = torch.cuda.get_device_properties(0).total_memory
     t = t/MegaBites
-    print("--> Total GPU-VRAM:{}".format( t ))
+    print("--> Total GPU-VRAM en GB:{}".format( t/1024 ))
 
     r = torch.cuda.memory_reserved(0) 
     r = (r/MegaBites)
     a = torch.cuda.memory_allocated(0)
     a = (a/MegaBites)
     f = r-a  # free inside reserved
-    print("Reserved:{} - Allocated:{} = {}".format(r, a, f ))
-    print("Total(4GB) - Reserved: {}".format( (t-r) ))
+    print("Free: Reserved:{} - Allocated:{} = {} MB".format(r, a, f ))
+    print("Total({}GB) - Reserved =".format(t/1024 ))
+    print("En {} MB".format( (t-r) ))
+    print("En {:.3f} GB".format( (t-r)/1024 ))
 
     device = get_device(cuda)
     num_classes=4
@@ -183,8 +185,10 @@ def demo0(images_folder_path, output_dir, cuda):
     a = (a/MegaBites)
     f = r-a  # free inside reserved
     print("------<<<<<------<<<<<-----Before FORs----->>>>>-------->>>>>------")
-    print("Reserved:{} - Allocated:{} = {}".format(r, a, f ))
-    print("Total(4GB) - Reserved: {}".format( (t-r)   ))
+    print("Free: Reserved:{} - Allocated:{} = {}".format(r, a, f ))
+    print("Total({}GB) - Reserved =".format(t/1024 ))
+    print("En {} MB".format( (t-r) ))
+    print("En {:.3f} GB".format( (t-r)/1024 ))
     print(" ")
     prevFree_GPUram = f 
 
@@ -208,6 +212,7 @@ def demo0(images_folder_path, output_dir, cuda):
         gcam = GradCAM(model=model)#, target_layer= targeted_layers) #Suponiendo que se retendran menos "hooks"
         probs, ids = gcam.forward(images)
         for claseToEval in range(4):
+            claseToEval = 3 - claseToEval
             #claseToEval = claseToEval+1
             #print( "Class:{}".format(claseToEval) )
             for target_layer in targeted_layers:
@@ -243,10 +248,12 @@ def demo0(images_folder_path, output_dir, cuda):
         a = torch.cuda.memory_allocated(0)
         a = (a/MegaBites)
         f = r-a  # free inside reserved
-        print("reduction on Free_GPUram: {}".format( (prevFree_GPUram - f) ))
+        print("reduction on Free_GPUram: {} MB".format( (prevFree_GPUram - f) ))
         print("------<<<<<------<<<<<-----XXX----->>>>>-------->>>>>------")
-        print("FREE: Reserved:{} - Allocated:{} = {}".format(r, a, f ))
-        print("Total(4GB) - Reserved: {}".format( t -r ))
+        print("Free: Reserved:{} - Allocated:{} = {} MB".format(r, a, f ))
+        print("Total({}GB) - Reserved =".format(t/1024 ))
+        print("En {} MB".format( (t-r) ))
+        print("En {:.3f} GB".format( (t-r)/1024 ))
         prevFree_GPUram = f
         """
         #Borrado de variables del ultimo ciclo "For"
