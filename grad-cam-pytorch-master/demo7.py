@@ -87,17 +87,30 @@ def save_gradient(filename, gradient):
     cv2.imwrite(filename, np.uint8(gradient))
 
 def save_gradcam(filename, gcam, raw_image, paper_cmap=False):
+    print("  ")
+    print("Save_GradCAM input:  ")
+    print("Shape of gcam: {}, Max value of gcam: {},  Min value of gcam: {}". format(
+        #gcam.shape, np.max(gcam), np.min(gcam)
+        gcam.size(), torch.max(gcam), torch.min(gcam)
+        )
+    )
     gcam = gcam.cpu().numpy()
+    print("gcam = gcam.cpu().numpy() and then:")
+    print("Shape of gcam: {}, Max value of gcam: {},  Min value of gcam: {}". format(
+        gcam.shape, np.max(gcam), np.min(gcam)
+        )
+    )
+    print("  ")
     cmap = cm.jet_r(gcam)[..., :3] * 255.0
     if paper_cmap:
         alpha = gcam[..., None]
         alpha = alpha * 0.3
         gcam = alpha * cmap + (1 - alpha) * raw_image
-        #reductionFactor = 0.5
-        #gcam=(alpha*reductionFactor)* cmap+(1-(alpha*(1-reductionFactor) ))*raw_image
 
     else:
-        gcam = (cmap.astype(np.float) + raw_image.astype(np.float)) / 2
+        valance = 0.3
+        #gcam = (cmap.astype(np.float) + raw_image.astype(np.float)) / 2
+        gcam = (     valance*(cmap.astype(np.float)) + (1-valance)*(raw_image.astype(np.float))   )
     cv2.imwrite(filename, np.uint8(gcam))
 
 def save_sensitivity(filename, maps):
@@ -571,15 +584,15 @@ def democlass3(images_folder_path, output_dir, cuda):
     t = t/MegaBites
     print("--> Total GPU-VRAM en GB:{}".format( t/1024 ))
 
-    r = torch.cuda.memory_reserved(0) 
-    r = (r/MegaBites)
-    a = torch.cuda.memory_allocated(0)
-    a = (a/MegaBites)
-    f = r-a  # free inside reserved
-    print("Free: Reserved:{} - Allocated:{} = {} MB".format(r, a, f ))
-    print("Total({}GB) - Reserved =".format(t/1024 ))
-    print("En {} MB".format( (t-r) ))
-    print("En {:.3f} GB".format( (t-r)/1024 ))
+    #r = torch.cuda.memory_reserved(0) 
+    #r = (r/MegaBites)
+    #a = torch.cuda.memory_allocated(0)
+    #a = (a/MegaBites)
+    #f = r-a  # free inside reserved
+    #print("Free: Reserved:{} - Allocated:{} = {} MB".format(r, a, f ))
+    #print("Total({}GB) - Reserved =".format(t/1024 ))
+    #print("En {} MB".format( (t-r) ))
+    #print("En {:.3f} GB".format( (t-r)/1024 ))
 
     device = get_device(cuda)
     num_classes=4
@@ -632,10 +645,16 @@ def democlass3(images_folder_path, output_dir, cuda):
     print("Total({}GB) - Reserved =".format(t/1024 ))
     print("En {} MB".format( (t-r) ))
     print("En {:.3f} GB".format( (t-r)/1024 ))
-    print(" ")
+    #print(" ")
+    #print(" ")
+    #print(" ")
     prevFree_GPUram = f 
 
     for filename in glob.glob('{}/*.png'.format(images_folder_path)):
+        print(" ")
+        print(" ")
+        print("------------------------------------")
+        print("------------------------------------")
         #print("ImgName: {}, ImgType:{}".format(images_folder_path, type(images_folder_path))  )
         #Image_Name = images_folder_path[0].split("\\")[-1]
         #Image_Name = filename.split("/")[-1]
@@ -669,6 +688,13 @@ def democlass3(images_folder_path, output_dir, cuda):
             #target_layer = "vgg16.avgpool"
 
             regions = gcam.generate(target_layer= target_layer)  
+            #print(type(regions))
+            print("  ")
+            print("Shape of regions: {}, Max value of regions: {},  Min value of regions: {}". format(
+                regions.size(), torch.max(regions), torch.min(regions) 
+                )
+            )
+            print("  ")
             #        for j in range(len(images)):
             save_gradcam(
                 filename=osp.join(
@@ -683,7 +709,7 @@ def democlass3(images_folder_path, output_dir, cuda):
                 #gcam=(0.1*regions[0, 0]),
                 #raw_image=raw_images[j],
                 raw_image=raw_images[0],
-                paper_cmap=True
+                #paper_cmap=True
             )
         #del gcam.backward(ids=ids_)
         r = torch.cuda.memory_reserved(0) 
@@ -691,12 +717,11 @@ def democlass3(images_folder_path, output_dir, cuda):
         a = torch.cuda.memory_allocated(0)
         a = (a/MegaBites)
         f = r-a  # free inside reserved
-        print("reduction on Free_GPUram: {} MB".format( (prevFree_GPUram - f) ))
-        print("------<<<<<------<<<<<-----XXX----->>>>>-------->>>>>------")
+        print("Reduction on Free_GPUram: {} MB".format( (prevFree_GPUram - f) ))
+        #print("------<<<<<------<<<<<-----XXX----->>>>>-------->>>>>------")
         print("Free: Reserved:{} - Allocated:{} = {} MB".format(r, a, f ))
         print("Total({}GB) - Reserved =".format(t/1024 ))
-        print("En {} MB".format( (t-r) ))
-        print("En {:.3f} GB".format( (t-r)/1024 ))
+        print("En {} MB, En {:.3f} GB".format(  (t-r),(t-r)/1024  ))
         prevFree_GPUram = f
         """
         #Borrado de variables del ultimo ciclo "For"
@@ -720,7 +745,7 @@ def democlass3(images_folder_path, output_dir, cuda):
         print("------<<<<<------<<<<<-----XXX----->>>>>-------->>>>>------")
         prevFree_GPUram = f
         # """
-        print(" ")
+
     ##############################
     #End of 3 FORs   #############
     ##############################

@@ -143,21 +143,34 @@ class GradCAM(_BaseWrapper):
         fmaps = self._find(self.fmap_pool, target_layer)
         grads = self._find(self.grad_pool, target_layer)
         weights = F.adaptive_avg_pool2d(grads, 1)
-
+        #print("----<<<<----GENERATE:")
+        #print("weights type: {} and size: {}, Max:{}, Min:{}".format(
+        #    type(weights), weights.size(), torch.max(weights), torch.min(weights)
+        #    )
+        #)
         gcam = torch.mul(fmaps, weights).sum(dim=1, keepdim=True)
         gcam = F.relu(gcam)
         gcam = F.interpolate(
             gcam, self.image_shape, mode="bilinear", align_corners=False
         )
-
+        #print("----<<<<----Generate-gcam:")
+        #print("gcam type: {} and size: {}, Max:{}, Min:{}".format(
+        #    type(gcam), gcam.size(), torch.max(gcam), torch.min(gcam)
+        #    )
+        #)
         B, C, H, W = gcam.shape
         gcam = gcam.view(B, -1)
         gcam -= gcam.min(dim=1, keepdim=True)[0]
-        gcam /= gcam.max(dim=1, keepdim=True)[0]
+        if not (gcam.max(dim=1, keepdim=True)[0] ) == 0:
+            gcam /= gcam.max(dim=1, keepdim=True)[0]
         gcam = gcam.view(B, C, H, W)
+        #print("Returned gcam type: {} and size: {}, Max:{}, Min:{}".format(
+        #    type(gcam), gcam.size(), torch.max(gcam), torch.min(gcam)
+        #    )
+        #)
 
         return gcam
-
+ 
 
 def occlusion_sensitivity(
     model, images, ids, mean=None, patch=35, stride=1, n_batches=128
