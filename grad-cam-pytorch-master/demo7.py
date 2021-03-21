@@ -87,20 +87,20 @@ def save_gradient(filename, gradient):
     cv2.imwrite(filename, np.uint8(gradient))
 
 def save_gradcam(filename, gcam, raw_image, paper_cmap=False):
-    print("  ")
-    print("Save_GradCAM input:  ")
-    print("Shape of gcam: {}, Max value of gcam: {},  Min value of gcam: {}". format(
-        #gcam.shape, np.max(gcam), np.min(gcam)
-        gcam.size(), torch.max(gcam), torch.min(gcam)
-        )
-    )
+    #print("  ")
+    #print("Save_GradCAM input:  ")
+    #print("Shape of gcam: {}, Max value of gcam: {},  Min value of gcam: {}". format(
+         ##gcam.shape, np.max(gcam), np.min(gcam)
+    #    gcam.size(), torch.max(gcam), torch.min(gcam)
+    #    )
+    #)
     gcam = gcam.cpu().numpy()
-    print("gcam = gcam.cpu().numpy() and then:")
-    print("Shape of gcam: {}, Max value of gcam: {},  Min value of gcam: {}". format(
-        gcam.shape, np.max(gcam), np.min(gcam)
-        )
-    )
-    print("  ")
+    #print("gcam = gcam.cpu().numpy() and then:")
+    #print("Shape of gcam: {}, Max value of gcam: {},  Min value of gcam: {}". format(
+    #    gcam.shape, np.max(gcam), np.min(gcam)
+    #    )
+    #)
+    #print("  ")
     cmap = cm.jet_r(gcam)[..., :3] * 255.0
     if paper_cmap:
         alpha = gcam[..., None]
@@ -709,7 +709,7 @@ def democlass3(images_folder_path, output_dir, cuda):
                 #gcam=(0.1*regions[0, 0]),
                 #raw_image=raw_images[j],
                 raw_image=raw_images[0],
-                #paper_cmap=True
+                paper_cmap=True
             )
         #del gcam.backward(ids=ids_)
         r = torch.cuda.memory_reserved(0) 
