@@ -86,7 +86,7 @@ def save_gradient(filename, gradient):
     gradient *= 255.0
     cv2.imwrite(filename, np.uint8(gradient))
 
-def save_gradcam(filename, gcam, raw_image, paper_cmap=False):
+def save_gradcam(filename, gcam, raw_image, paper_cmap=False, valance=0.5):
     #print("  ")
     #print("Save_GradCAM input:  ")
     #print("Shape of gcam: {}, Max value of gcam: {},  Min value of gcam: {}". format(
@@ -104,11 +104,10 @@ def save_gradcam(filename, gcam, raw_image, paper_cmap=False):
     cmap = cm.jet_r(gcam)[..., :3] * 255.0
     if paper_cmap:
         alpha = gcam[..., None]
-        alpha = alpha * 0.3
+        alpha = alpha * valance
         gcam = alpha * cmap + (1 - alpha) * raw_image
 
     else:
-        valance = 0.3
         #gcam = (cmap.astype(np.float) + raw_image.astype(np.float)) / 2
         gcam = (     valance*(cmap.astype(np.float)) + (1-valance)*(raw_image.astype(np.float))   )
     cv2.imwrite(filename, np.uint8(gcam))
@@ -123,48 +122,42 @@ def save_sensitivity(filename, maps):
     maps = cv2.resize(maps, (224, 224), interpolation=cv2.INTER_NEAREST)
     cv2.imwrite(filename, maps)
 
-@click.group()
-@click.pass_context
-def main(ctx):
-    print("Mode:", ctx.invoked_subcommand)
-    #torch.cuda.empty_cache()
-
-@main.command()
-#@click.option("-i", "--images_folder_path", type=str, multiple=True, required=True)
-@click.option("-i", "--images_folder_path", type=str, required=True)
-#@click.option("-c", "--claseToEval", type=int, required=True)
-@click.option("-o", "--output-dir", type=str, default="./results")
-@click.option("--cuda/--cpu", default=True)
-#def demo0(image_paths, claseToEval, output_dir, cuda):
-def demo0(images_folder_path, output_dir, cuda):
-    print("Demo-0 running")
+def gpu_space(prevFree_GPUram = 0.0, all = False):
     MegaBites= 1024*1024
     t = torch.cuda.get_device_properties(0).total_memory
     t = t/MegaBites
-    print("--> Total GPU-VRAM en GB:{}".format( t/1024 ))
+    if all:
+        print(" --> Total GPU-VRAM en GB:{}".format( t/1024 ))
 
     r = torch.cuda.memory_reserved(0) 
     r = (r/MegaBites)
     a = torch.cuda.memory_allocated(0)
     a = (a/MegaBites)
-    f = r-a  # free inside reserved
-    print("Free: Reserved:{} - Allocated:{} = {} MB".format(r, a, f ))
-    print("Total({}GB) - Reserved =".format(t/1024 ))
-    print("En {} MB".format( (t-r) ))
-    print("En {:.3f} GB".format( (t-r)/1024 ))
+    f = r-a  # free inside reserved ...in MB
+    if not prevFree_GPUram == 0.0:
+        print(" Reduction on Free_GPUram: {:.3f}MB".format( (prevFree_GPUram - f) ))
+    #print("------<<<<<------<<<<<-----XXX----->>>>>-------->>>>>------")
+    print(" Free: Reserved:{:.3f}-Allocated:{:.3f}= {:.3f}MB".format(r, a, f ))
+    print(" Total({}GB)-Reserved=> En {:.3f}MB, En {:.3f}GB".format(
+        t/1024,                    (t-r),     (t-r)/1024
+        )
+    )
+    #print("    ")
+    return f
 
-    device = get_device(cuda)
-    num_classes=4
-    targeted_layers = ["avgpool"]
-    # Model
+def loading_NNModel(namemodel_loaded, num_classes=4 ):
     #Instruction to read a model from a "xxx.ckpt" file 
     #model = AlexnetModel(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None) #seed=manualSeed)   #<<<<<<<<<<<<<<<<-----<<<<----<<<---
     #model = Vgg16Model(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None)
     #model = Vgg16Model(hparams={}, num_classes=4, pretrained=False, seed=None)
     model = models.vgg16()
-    model.classifier = torch.nn.Sequential(torch.nn.Linear(25088, 4096), torch.nn.ReLU(), torch.nn.Dropout(p=0.5), torch.nn.Linear(4096, 256), torch.nn.ReLU(), torch.nn.Dropout(p=0.5), torch.nn.Linear(256, num_classes))
-    NameModelLoaded = "vgg16_4c_combined.ckpt"
-    model_loaded = torch.load("{}".format(NameModelLoaded))
+    model.classifier = torch.nn.Sequential(
+        torch.nn.Linear(25088, 4096),  torch.nn.ReLU(),
+        torch.nn.Dropout(p=0.5),       torch.nn.Linear(4096, 256),
+        torch.nn.ReLU(),               torch.nn.Dropout(p=0.5),
+        torch.nn.Linear(256, num_classes)
+        )
+    model_loaded = torch.load("{}".format(namemodel_loaded))
     #print (">>>>>>>>>print of the loading the vgg16_6Classes.ckpt model <<<<<<<<<<<<")
     for l in model_loaded:
         #print(l)
@@ -174,100 +167,113 @@ def demo0(images_folder_path, output_dir, cuda):
                 NewLayerName = layerName.split(".", 1)[1]
                 #print(NewLayerName)
                 corrected_dict[NewLayerName] = model_loaded["state_dict"][layerName]
-            print (">>>>>>>>> Loading the state_dict of {} <<<<<<<<<<<<".format(NameModelLoaded))
+            print (" >>>>>>>>> Loading the state_dict of {} <<<<<<<<<<<<".format(namemodel_loaded))
             #print(corrected_dict)
             model.load_state_dict(corrected_dict)
-    del model_loaded
-    del corrected_dict
-    del layerName
-    del NewLayerName
-    del NameModelLoaded
+    #del model_loaded
+    #del corrected_dict
+    #del layerName
+    #del NewLayerName
+    #del NameModelLoaded
 
+    return model
+
+def printing_spaces():
+    print(" ------------------------------------")
+    print(" ------------------------------------")
+    print(" ")
+    print(" ")
+
+def Imags_dir_and_name(filename):
+    Image_Name = filename.split("\\")[-1]
+    Image_Name = Image_Name.split("/")[-1]
+    Image_Name = Image_Name.split(".",1)[0]
+    #print("File_Name: {}".format(filename) )
+    #print("CutImgName: {}, CutImgType:{}".format(Image_Name, type(Image_Name))  )
+    print(" Image_Name: {}".format(Image_Name))
+    dir = [filename]
+
+    return Image_Name, dir
+
+
+
+@click.group()
+@click.pass_context
+def main(ctx):
+    print(" Mode:", ctx.invoked_subcommand)
+    #torch.cuda.empty_cache()
+
+@main.command()
+#@click.option("-i", "--images_folder_path", type=str, multiple=True, required=True)
+@click.option("-i", "--images_folder_path", type=str, required=True)
+@click.option("-t", "--namemodel_loaded", type=str, required=True)
+#@click.option("-c", "--claseToEval", type=int, required=True)
+@click.option("-o", "--output-dir", type=str, default="./results")
+@click.option("--cuda/--cpu", default=True)
+#def demo0(image_paths, claseToEval, output_dir, cuda):
+def demo0(images_folder_path, namemodel_loaded, output_dir, cuda):
+    device = get_device(cuda) #check if their is a available GPU
+    #prints the total GPU RAM, 
+    #reserved, availableallocated, free and reduced.
+    prevFree_GPUram = gpu_space(all = True, prevFree_GPUram = 0.0)                
+    num_classes=4
+    targeted_layers = ["avgpool"]
+
+    # Model
+    #  Names of the NN models to be loaded
+    #namemodel_loaded = "vgg16_4c_combined.ckpt"
+    #namemodel_loaded = "vgg16_4c_sections.ckpt"
+    #namemodel_loaded = "vgg16_4c_surface.ckpt"
+    model = loading_NNModel(namemodel_loaded, num_classes)
     model.to(device)
     model.eval()
-    # The ... residual layers
-    #target_layers = ["classifier.6", "classifier", "avgpool", "features", "features.30", "features.20", "features.10", "features.0"]
-    #--->>>target_layers = ["vgg16.avgpool"]#,"vgg16.features.28","vgg16.features.0"]
-    #target_layers = ["alex.features.12", "alex.features", "alex.avgpool"]
-    #--->>>classes =[claseToEval]#,1,2,3]   # "ACIDE = 0", "Brhusite = 1", "Weddellite = 2", "Whewellite = 3"?
-    #folderPath = '{}/*.png'.format(images_folder_path)
-    #print(folderPath)
-    r = torch.cuda.memory_reserved(0) 
-    r = (r/MegaBites)
-    a = torch.cuda.memory_allocated(0)
-    a = (a/MegaBites)
-    f = r-a  # free inside reserved
-    print("------<<<<<------<<<<<-----Before FORs----->>>>>-------->>>>>------")
-    print("Free: Reserved:{} - Allocated:{} = {}".format(r, a, f ))
-    print("Total({}GB) - Reserved =".format(t/1024 ))
-    print("En {} MB".format( (t-r) ))
-    print("En {:.3f} GB".format( (t-r)/1024 ))
-    print(" ")
-    prevFree_GPUram = f 
 
+    prevFree_GPUram = gpu_space(prevFree_GPUram)
+    print(" ------<<<<<------<<<<<-----Before FORs----->>>>>-------->>>>>------")
     for filename in glob.glob('{}/*.png'.format(images_folder_path)):
-        #print("ImgName: {}, ImgType:{}".format(images_folder_path, type(images_folder_path))  )
-        #Image_Name = images_folder_path[0].split("\\")[-1]
-        #Image_Name = filename.split("/")[-1]
-        Image_Name = filename.split("\\")[-1]
-        Image_Name = Image_Name.split("/")[-1]
-        Image_Name = Image_Name.split(".",1)[0]
-        #print("File_Name: {}".format(filename) )
-        #print("CutImgName: {}, CutImgType:{}".format(Image_Name, type(Image_Name))  )
-        print("{}".format(Image_Name))
-        #print(" ")
-        dir = [filename]
-        # Images  
-        #print("image_paths:{}".format(image_paths))
+        printing_spaces()
+        #  The "filename"(path to an image) is given to obtain: 
+        #the name of the image and 
+        #the path to the image is returned as a list
+        Image_Name, dir = Imags_dir_and_name(filename)
+
+        #  Images  
         images, raw_images = load_images(dir)
         images = torch.stack(images).to(device)
-        #print(    "Images lenght: {}".format(len(images) )   )
+
+        #  Grad-CAM
         gcam = GradCAM(model=model)#, target_layer= targeted_layers) #Suponiendo que se retendran menos "hooks"
         probs, ids = gcam.forward(images)
+
         for claseToEval in range(4):
-            claseToEval = 3 - claseToEval
+            #claseToEval = 3 - claseToEval
             #claseToEval = claseToEval+1
             #print( "Class:{}".format(claseToEval) )
             for target_layer in targeted_layers:
-                #for target_class in classes:
                 ids_ = torch.LongTensor([[claseToEval]] * len(images)).to(device)    #target_class]] * len(images)).to(device)
                 gcam.backward(ids=ids_)
-                #    for target_layer in target_layers:
-                #print("Generating Grad-CAM @{}".format(target_layer))
-                #print("Generating Grad-CAM vgg16.avgpool")
-                # Grad-CAM
-                #target_layer = "vgg16.avgpool"
-
-                regions = gcam.generate(target_layer= target_layer)  
-                #        for j in range(len(images)):
+                regions = gcam.generate(target_layer= target_layer) 
+                """
+                print("Type of regions: {}, shape: {}, Max value of regions: {},  Min value of regions: {}". format(
+                    type(regions),regions.size(), torch.max(regions), torch.min(regions) 
+                    )
+                ) 
+                #"""
                 save_gradcam(
                     filename=osp.join(
                         output_dir,
                         #"{}_{}_Class-{}_({:.5f}).png".format(
-                        "VGG16-avgpool--{}--C{}({:.5f}).png".format(
+                        "VGG16-avgpool-{}-C{}({:.5f}).png".format(
                             Image_Name, claseToEval, float(probs[ids == claseToEval])
                         ),
                     ),
                     #gcam=regions[j, 0],
                     gcam=regions[0, 0],
-                    #gcam=(0.1*regions[0, 0]),
                     #raw_image=raw_images[j],
                     raw_image=raw_images[0],
-                    paper_cmap=True
+                    paper_cmap=True, valance=0.3
                 )
-            #del gcam.backward(ids=ids_)
-        r = torch.cuda.memory_reserved(0) 
-        r = (r/MegaBites)
-        a = torch.cuda.memory_allocated(0)
-        a = (a/MegaBites)
-        f = r-a  # free inside reserved
-        print("reduction on Free_GPUram: {} MB".format( (prevFree_GPUram - f) ))
-        print("------<<<<<------<<<<<-----XXX----->>>>>-------->>>>>------")
-        print("Free: Reserved:{} - Allocated:{} = {} MB".format(r, a, f ))
-        print("Total({}GB) - Reserved =".format(t/1024 ))
-        print("En {} MB".format( (t-r) ))
-        print("En {:.3f} GB".format( (t-r)/1024 ))
-        prevFree_GPUram = f
+        prevFree_GPUram = gpu_space(prevFree_GPUram)
         """
         #Borrado de variables del ultimo ciclo "For"
         gcam.remove_hook()
@@ -278,19 +284,7 @@ def demo0(images_folder_path, output_dir, cuda):
         del ids
         del ids_
         del regions
-        r = torch.cuda.memory_reserved(0) 
-        a = torch.cuda.memory_allocated(0)
-        f = r-a  # free inside reserved
-        print("-------------------------------------")
-        print("reduction on Free_GPUram: {}".format( (prevFree_GPUram-f)/MegaBites ))
-        print("Reserved:{}".format(  (r/MegaBites)   ))
-        print("Allocated:{}".format( (a/MegaBites)   ))
-        print("Total - Reserved:{}".format(  (t-r)/MegaBites  ))
-        print("Reserved - Allocated: {}".format( (f/MegaBites)   ))
-        print("------<<<<<------<<<<<-----XXX----->>>>>-------->>>>>------")
-        prevFree_GPUram = f
         # """
-        print(" ")
     ##############################
     #End of 3 FORs   #############
     ##############################
@@ -573,158 +567,78 @@ def demo9(image_path, output_dir, cuda):
 @main.command()
 #@click.option("-i", "--images_folder_path", type=str, multiple=True, required=True)
 @click.option("-i", "--images_folder_path", type=str, required=True)
+@click.option("-t", "--namemodel_loaded", type=str, required=True)
 #@click.option("-c", "--claseToEval", type=int, required=True)
 @click.option("-o", "--output-dir", type=str, default="./results")
 @click.option("--cuda/--cpu", default=True)
 #def demo0(image_paths, claseToEval, output_dir, cuda):
-def democlass3(images_folder_path, output_dir, cuda):
+def democlass3(images_folder_path, namemodel_loaded, output_dir, cuda):
     print("Demo Class 3 running")
-    MegaBites= 1024*1024
-    t = torch.cuda.get_device_properties(0).total_memory
-    t = t/MegaBites
-    print("--> Total GPU-VRAM en GB:{}".format( t/1024 ))
+    gpu_space(all = True) #prints the total GPU RAM, 
+                          #reserved, availableallocated, free and reduced.
 
-    #r = torch.cuda.memory_reserved(0) 
-    #r = (r/MegaBites)
-    #a = torch.cuda.memory_allocated(0)
-    #a = (a/MegaBites)
-    #f = r-a  # free inside reserved
-    #print("Free: Reserved:{} - Allocated:{} = {} MB".format(r, a, f ))
-    #print("Total({}GB) - Reserved =".format(t/1024 ))
-    #print("En {} MB".format( (t-r) ))
-    #print("En {:.3f} GB".format( (t-r)/1024 ))
-
+    #  Now we will set some variables:
     device = get_device(cuda)
-    num_classes=4
-    targeted_layers = ["avgpool"]
-    claseToEval = 3
+    num_classes=4 #Output clases of the NN model.
+    targeted_layers = ["avgpool"] #Layers to generated GradCAM on.
+    claseToEval = 3 #clase to be evaluated out of the 4 possible.
 
-    # Model
-    #Instruction to read a model from a "xxx.ckpt" file 
-    #model = AlexnetModel(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None) #seed=manualSeed)   #<<<<<<<<<<<<<<<<-----<<<<----<<<---
-    #model = Vgg16Model(hparams={"lr": 0.00005}, num_classes=4, pretrained=False, seed=None)
-    #model = Vgg16Model(hparams={}, num_classes=4, pretrained=False, seed=None)
-    model = models.vgg16()
-    model.classifier = torch.nn.Sequential(torch.nn.Linear(25088, 4096), torch.nn.ReLU(), torch.nn.Dropout(p=0.5), torch.nn.Linear(4096, 256), torch.nn.ReLU(), torch.nn.Dropout(p=0.5), torch.nn.Linear(256, num_classes))
-    NameModelLoaded = "vgg16_4c_combined.ckpt"
-    model_loaded = torch.load("{}".format(NameModelLoaded))
-    #print (">>>>>>>>>print of the loading the vgg16_6Classes.ckpt model <<<<<<<<<<<<")
-    for l in model_loaded:
-        #print(l)
-        if l == "state_dict":
-            corrected_dict = {}
-            for layerName in model_loaded["state_dict"]:
-                NewLayerName = layerName.split(".", 1)[1]
-                #print(NewLayerName)
-                corrected_dict[NewLayerName] = model_loaded["state_dict"][layerName]
-            print (">>>>>>>>> Loading the state_dict of {} <<<<<<<<<<<<".format(NameModelLoaded))
-            #print(corrected_dict)
-            model.load_state_dict(corrected_dict)
-    del model_loaded
-    del corrected_dict
-    del layerName
-    del NewLayerName
-    del NameModelLoaded
+    #  Names of the NN models to be loaded
+    #NameModelLoaded = "vgg16_4c_combined.ckpt"
+    #NameModelLoaded = "vgg16_4c_sections.ckpt"
+    #NameModelLoaded = "vgg16_4c_surface.ckpt"
 
+    #  Model  
+    model = loading_NNModel(namemodel_loaded, num_classes)
     model.to(device)
     model.eval()
-    # The ... residual layers
-    #target_layers = ["classifier.6", "classifier", "avgpool", "features", "features.30", "features.20", "features.10", "features.0"]
-    #--->>>target_layers = ["vgg16.avgpool"]#,"vgg16.features.28","vgg16.features.0"]
-    #target_layers = ["alex.features.12", "alex.features", "alex.avgpool"]
-    #--->>>classes =[claseToEval]#,1,2,3]   # "ACIDE = 0", "Brhusite = 1", "Weddellite = 2", "Whewellite = 3"?
-    #folderPath = '{}/*.png'.format(images_folder_path)
-    #print(folderPath)
-    r = torch.cuda.memory_reserved(0) 
-    r = (r/MegaBites)
-    a = torch.cuda.memory_allocated(0)
-    a = (a/MegaBites)
-    f = r-a  # free inside reserved
-    print("------<<<<<------<<<<<-----Before FORs----->>>>>-------->>>>>------")
-    print("Free: Reserved:{} - Allocated:{} = {}".format(r, a, f ))
-    print("Total({}GB) - Reserved =".format(t/1024 ))
-    print("En {} MB".format( (t-r) ))
-    print("En {:.3f} GB".format( (t-r)/1024 ))
-    #print(" ")
-    #print(" ")
-    #print(" ")
-    prevFree_GPUram = f 
 
+    gpu_space()
+    print("------<<<<<------<<<<<-----Before FORs----->>>>>-------->>>>>------")
     for filename in glob.glob('{}/*.png'.format(images_folder_path)):
-        print(" ")
-        print(" ")
-        print("------------------------------------")
-        print("------------------------------------")
-        #print("ImgName: {}, ImgType:{}".format(images_folder_path, type(images_folder_path))  )
-        #Image_Name = images_folder_path[0].split("\\")[-1]
-        #Image_Name = filename.split("/")[-1]
+        printing_spaces()
+
         Image_Name = filename.split("\\")[-1]
         Image_Name = Image_Name.split("/")[-1]
         Image_Name = Image_Name.split(".",1)[0]
         #print("File_Name: {}".format(filename) )
         #print("CutImgName: {}, CutImgType:{}".format(Image_Name, type(Image_Name))  )
-        print("{}".format(Image_Name))
+        print("Image_Name: {}".format(Image_Name))
         #print(" ")
-        dir = [filename]
+
         # Images  
-        #print("image_paths:{}".format(image_paths))
+        dir = [filename]
         images, raw_images = load_images(dir)
         images = torch.stack(images).to(device)
-        #print(    "Images lenght: {}".format(len(images) )   )
+        #  Grad-CAM
         gcam = GradCAM(model=model)#, target_layer= targeted_layers) #Suponiendo que se retendran menos "hooks"
         probs, ids = gcam.forward(images)
-        #for claseToEval in range(4):
-        #claseToEval = 3
-        #claseToEval = claseToEval+1
-        #print( "Class:{}".format(claseToEval) )
+
         for target_layer in targeted_layers:
-            #for target_class in classes:
             ids_ = torch.LongTensor([[claseToEval]] * len(images)).to(device)    #target_class]] * len(images)).to(device)
             gcam.backward(ids=ids_)
-            #    for target_layer in target_layers:
-            #print("Generating Grad-CAM @{}".format(target_layer))
-            #print("Generating Grad-CAM vgg16.avgpool")
-            # Grad-CAM
-            #target_layer = "vgg16.avgpool"
-
             regions = gcam.generate(target_layer= target_layer)  
-            #print(type(regions))
-            print("  ")
-            print("Shape of regions: {}, Max value of regions: {},  Min value of regions: {}". format(
-                regions.size(), torch.max(regions), torch.min(regions) 
+            print("Type of regions: {}, shape: {}, Max value of regions: {},  Min value of regions: {}". format(
+                type(regions),regions.size(), torch.max(regions), torch.min(regions) 
                 )
             )
-            print("  ")
-            #        for j in range(len(images)):
+
             save_gradcam(
                 filename=osp.join(
                     output_dir,
-                    #"{}_{}_Class-{}_({:.5f}).png".format(
                     "VGG16-avgpool--{}--C{}({:.5f}).png".format(
                         Image_Name, claseToEval, float(probs[ids == claseToEval])
                     ),
                 ),
                 #gcam=regions[j, 0],
                 gcam=regions[0, 0],
-                #gcam=(0.1*regions[0, 0]),
                 #raw_image=raw_images[j],
                 raw_image=raw_images[0],
-                paper_cmap=True
+                paper_cmap=True, valance=0.3
             )
-        #del gcam.backward(ids=ids_)
-        r = torch.cuda.memory_reserved(0) 
-        r = (r/MegaBites)
-        a = torch.cuda.memory_allocated(0)
-        a = (a/MegaBites)
-        f = r-a  # free inside reserved
-        print("Reduction on Free_GPUram: {} MB".format( (prevFree_GPUram - f) ))
-        #print("------<<<<<------<<<<<-----XXX----->>>>>-------->>>>>------")
-        print("Free: Reserved:{} - Allocated:{} = {} MB".format(r, a, f ))
-        print("Total({}GB) - Reserved =".format(t/1024 ))
-        print("En {} MB, En {:.3f} GB".format(  (t-r),(t-r)/1024  ))
-        prevFree_GPUram = f
+        gpu_space()
         """
-        #Borrado de variables del ultimo ciclo "For"
+        #  Borrado de variables del ultimo ciclo "For"
         gcam.remove_hook()
         del gcam
         del images
@@ -733,31 +647,17 @@ def democlass3(images_folder_path, output_dir, cuda):
         del ids
         del ids_
         del regions
-        r = torch.cuda.memory_reserved(0) 
-        a = torch.cuda.memory_allocated(0)
-        f = r-a  # free inside reserved
-        print("-------------------------------------")
-        print("reduction on Free_GPUram: {}".format( (prevFree_GPUram-f)/MegaBites ))
-        print("Reserved:{}".format(  (r/MegaBites)   ))
-        print("Allocated:{}".format( (a/MegaBites)   ))
-        print("Total - Reserved:{}".format(  (t-r)/MegaBites  ))
-        print("Reserved - Allocated: {}".format( (f/MegaBites)   ))
-        print("------<<<<<------<<<<<-----XXX----->>>>>-------->>>>>------")
-        prevFree_GPUram = f
         # """
-
     ##############################
     #End of 3 FORs   #############
     ##############################
     del model
-    #with torch.no_grad():
-    #    torch.cuda.empty_cache()
     torch.cuda.empty_cache()
     print("          -------->>><<<<-----------")
-    print("----------      Fin de DemoClass3        ")
+    print("----------      Fin de Demo Class3        ")
     print("          -------->>><<<<-----------")
 
 if __name__ == "__main__":
-    torch.cuda.empty_cache()
+    #torch.cuda.empty_cache()
     main()
-    torch.cuda.empty_cache()
+    #torch.cuda.empty_cache()
