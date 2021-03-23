@@ -74,7 +74,8 @@ def preprocess(image_path):
     image = transforms.Compose(
         [
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            transforms.Normalize(mean=[0.614, 0.481, 0.3006], std=[0.0812, 0.0787, 0.0751]),
+            #transforms.Normalize(mean=[0.485, 0.456, 0.406],  std=[0.229, 0.224, 0.225]),
         ]
     )(raw_image[..., ::-1].copy())
     return image, raw_image
@@ -161,7 +162,8 @@ def loading_NNModel(namemodel_loaded, num_classes=4 ):
         torch.nn.Linear(256, num_classes)
         )
     model_loaded = torch.load("{}".format(namemodel_loaded))
-    #print (">>>>>>>>>print of the loading the vgg16_6Classes.ckpt model <<<<<<<<<<<<")
+    print ("            >>>>>>>>> model <<<<<<<<<<<<")
+    print(model)
     for l in model_loaded:
         #print(l)
         if l == "state_dict":
@@ -431,6 +433,132 @@ def democlass(images_folder_path, namemodel_loaded, clase_to_eval, output_dir, c
     print("          -------->>><<<<-----------")
     print("----------      Fin de Demo Class3        ")
     print("          -------->>><<<<-----------")
+
+@main.command()
+#@click.option("-i", "--images_folder_path", type=str, multiple=True, required=True)
+@click.option("-i", "--images_folder_path", type=str, required=True)
+@click.option("-t", "--namemodel_loaded", type=str, required=True)
+#@click.option("-c", "--claseToEval", type=int, required=True)
+@click.option("-o", "--output-dir", type=str, default="./results")
+@click.option("--cuda/--cpu", default=True)
+#def demo0(image_paths, claseToEval, output_dir, cuda):
+def democsv(images_folder_path, namemodel_loaded, output_dir, cuda):
+    device = get_device(cuda) #check if their is a available GPU
+    #prints the total GPU RAM, 
+    #reserved, availableallocated, free and reduced.
+    prevFree_GPUram = gpu_space(all = True, prevFree_GPUram = 0.0)                
+    num_classes=4
+    targeted_layers = ["avgpool"]
+
+    # Model
+    #  Names of the NN models to be loaded
+    #namemodel_loaded = "vgg16_4c_combined.ckpt"
+    #namemodel_loaded = "vgg16_4c_sections.ckpt"
+    #namemodel_loaded = "vgg16_4c_surface.ckpt"
+    model = loading_NNModel(namemodel_loaded, num_classes)
+    model.to(device)
+    model.eval()
+
+    prevFree_GPUram = gpu_space(prevFree_GPUram)
+    print(" ------<<<<<------<<<<<-----Before FORs----->>>>>-------->>>>>------")
+    for filename in glob.glob('{}/*.png'.format(images_folder_path)):
+        printing_spaces()
+        #  The "filename"(path to an image) is given to obtain: 
+        #the name of the image and 
+        #the path to the image is returned as a list
+        Image_Name, dir = Imags_dir_and_name(filename)
+
+        #  Images  
+        images, raw_images = load_images(dir)
+        images = torch.stack(images).to(device)
+
+        #  Grad-CAM
+        gcam = GradCAM(model=model)#, target_layer= targeted_layers) #Suponiendo que se retendran menos "hooks"
+        probs, ids = gcam.forward(images)
+
+        # Guided Backpropagation
+        gbp = GuidedBackPropagation(model=model)
+        _ = gbp.forward(images)
+
+        for claseToEval in range(4):
+            gbp.backward(ids=ids[:, [claseToEval]])
+            gcam.backward(ids=ids[:, [claseToEval]])
+            
+            for target_layer in targeted_layers:
+                #ids_ = torch.LongTensor([[claseToEval]] * len(images)).to(device)    #target_class]] * len(images)).to(device)
+                #gcam.backward(ids=ids_)
+                gradients = gbp.generate()
+                regions = gcam.generate(target_layer= target_layer)
+                """
+                print("Type of regions: {}, shape: {}, Max value of regions: {},  Min value of regions: {}". format(
+                    type(regions),regions.size(), torch.max(regions), torch.min(regions) 
+                    )
+                ) 
+                #"""
+
+                save_gradcam(
+                    filename=osp.join(
+                        output_dir,
+                        #"{}_{}_Class-{}_({:.5f}).png".format(
+                        "VGG16-avgpool-{}-C{}({:.5f}).png".format(
+                            Image_Name, claseToEval, float(probs[ ids == claseToEval])
+                        ),
+                    ),
+                    #gcam=regions[j, 0],
+                    gcam=regions[0, 0],
+                    #raw_image=raw_images[j],
+                    raw_image=raw_images[0],
+                    paper_cmap=True, valance=0.3
+                )
+                # Guided Grad-CAM
+                save_gradient(
+                    filename=osp.join(
+                        output_dir,
+                        #"{}_{}_Class-{}_({:.5f}).png".format(
+                        "VGG16-avgpool-{}-C{}({:.5f})_Guided.png".format(
+                            Image_Name, claseToEval, float(probs[ids == claseToEval])
+                        ),
+                    ),
+                    gradient=torch.mul(regions, gradients)[0]
+                    #gradient=torch.mul(regions, gradients)[0],
+                    #raw_image=raw_images[0],
+                    #paper_cmap=True, valance=0.3
+                )
+                """
+                # Guided Grad-CAM
+                save_gradient(
+                    filename=osp.join(
+                        output_dir,
+                        "Guided_GCAM_VGG16-avgpool-{}-C{}({:.5f}).png".format(
+                            Image_Name, claseToEval, float(probs[ids == claseToEval])
+                        ),
+                    ),
+                    gradient=torch.mul(regions, gradients)[0],
+                )
+                #"""
+        prevFree_GPUram = gpu_space(prevFree_GPUram)
+        """
+        #Borrado de variables del ultimo ciclo "For"
+        gcam.remove_hook()
+        del gcam
+        del images
+        del raw_images
+        del probs
+        del ids
+        del ids_
+        del regions
+        # """
+    ##############################
+    #End of 3 FORs   #############
+    ##############################
+    del model
+    #with torch.no_grad():
+    #    torch.cuda.empty_cache()
+    torch.cuda.empty_cache()
+    print("          -------->>><<<<-----------")
+    print("----------      Fin de Demo CSV        ")
+    print("          -------->>><<<<-----------")
+
 
 if __name__ == "__main__":
     #torch.cuda.empty_cache()

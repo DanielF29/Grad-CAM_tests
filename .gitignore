@@ -3,7 +3,10 @@
 *.png
 *.zip
 *.rar
+*.csv
 grad-cam-pytorch-master/*.ckpt
 grad-cam-pytorch-master/ml_kidney_stones_main
 grad-cam-pytorch-master/docs
 grad-cam-pytorch-master/results/*
+
+/samples/*
