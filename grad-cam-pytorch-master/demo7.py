@@ -43,10 +43,10 @@ def get_device(cuda):
     #device = torch.device("cuda")  #codigo modificado para forzar que se use la GPU
     if cuda:
         current_device = torch.cuda.current_device()
-        print("Device:", torch.cuda.get_device_name(current_device))
+        print(" Device:", torch.cuda.get_device_name(current_device))
     else:
         #print("Device: CPU")  #codigo original
-        print("Device:", torch.cuda.get_device_name(current_device)) #para forzar que imprima el divice usado
+        print(" Device:", torch.cuda.get_device_name(current_device)) #para forzar que imprima el divice usado
     return device
 
 def load_images(image_paths):
@@ -82,8 +82,11 @@ def preprocess(image_path):
 def save_gradient(filename, gradient):
     gradient = gradient.cpu().numpy().transpose(1, 2, 0)
     gradient -= gradient.min()
-    gradient /= gradient.max()
+    if not gradient.max() == 0:
+        gradient /= gradient.max()
+    #cmap = cm.jet_r(gradient)[..., :3]* 255.0
     gradient *= 255.0
+
     cv2.imwrite(filename, np.uint8(gradient))
 
 def save_gradcam(filename, gcam, raw_image, paper_cmap=False, valance=0.5):
@@ -196,7 +199,6 @@ def Imags_dir_and_name(filename):
     return Image_Name, dir
 
 
-
 @click.group()
 @click.pass_context
 def main(ctx):
@@ -245,20 +247,30 @@ def demo0(images_folder_path, namemodel_loaded, output_dir, cuda):
         gcam = GradCAM(model=model)#, target_layer= targeted_layers) #Suponiendo que se retendran menos "hooks"
         probs, ids = gcam.forward(images)
 
+        # Guided Backpropagation
+        gbp = GuidedBackPropagation(model=model)
+        _ = gbp.forward(images)
+
         for claseToEval in range(4):
-            #claseToEval = 3 - claseToEval
-            #claseToEval = claseToEval+1
-            #print( "Class:{}".format(claseToEval) )
+            gbp.backward(ids=ids[:, [claseToEval]])
+            gcam.backward(ids=ids[:, [claseToEval]])
+            
             for target_layer in targeted_layers:
-                ids_ = torch.LongTensor([[claseToEval]] * len(images)).to(device)    #target_class]] * len(images)).to(device)
-                gcam.backward(ids=ids_)
-                regions = gcam.generate(target_layer= target_layer) 
+                #ids_ = torch.LongTensor([[claseToEval]] * len(images)).to(device)    #target_class]] * len(images)).to(device)
+                #gcam.backward(ids=ids_)
+                gradients = gbp.generate()
+                regions = gcam.generate(target_layer= target_layer)
                 """
                 print("Type of regions: {}, shape: {}, Max value of regions: {},  Min value of regions: {}". format(
                     type(regions),regions.size(), torch.max(regions), torch.min(regions) 
                     )
                 ) 
                 #"""
+
+                print("Type of regions: {}, shape: {}, Max value of regions: {},  Min value of regions: {}". format(
+                    type(regions),regions.size(), torch.max(regions), torch.min(regions) 
+                    )
+                ) 
                 save_gradcam(
                     filename=osp.join(
                         output_dir,
@@ -273,6 +285,32 @@ def demo0(images_folder_path, namemodel_loaded, output_dir, cuda):
                     raw_image=raw_images[0],
                     paper_cmap=True, valance=0.3
                 )
+                # Guided Grad-CAM
+                save_gradient(
+                    filename=osp.join(
+                        output_dir,
+                        #"{}_{}_Class-{}_({:.5f}).png".format(
+                        "VGG16-avgpool-{}-C{}({:.5f})_Guided.png".format(
+                            Image_Name, claseToEval, float(probs[ids == claseToEval])
+                        ),
+                    ),
+                    gradient=torch.mul(regions, gradients)[0]
+                    #gradient=torch.mul(regions, gradients)[0],
+                    #raw_image=raw_images[0],
+                    #paper_cmap=True, valance=0.3
+                )
+                """
+                # Guided Grad-CAM
+                save_gradient(
+                    filename=osp.join(
+                        output_dir,
+                        "Guided_GCAM_VGG16-avgpool-{}-C{}({:.5f}).png".format(
+                            Image_Name, claseToEval, float(probs[ids == claseToEval])
+                        ),
+                    ),
+                    gradient=torch.mul(regions, gradients)[0],
+                )
+                #"""
         prevFree_GPUram = gpu_space(prevFree_GPUram)
         """
         #Borrado de variables del ultimo ciclo "For"
