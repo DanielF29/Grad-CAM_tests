@@ -380,22 +380,23 @@ def democlass(images_folder_path, namemodel_loaded, clase_to_eval, output_dir, c
         #  Grad-CAM
         gcam = GradCAM(model=model)#, target_layer= targeted_layers) #Suponiendo que se retendran menos "hooks"
         probs, ids = gcam.forward(images)
-        
+        """
         print("Type of probs: {}, shape: {}, positions: {}, {}, {}, {}". format(
-                type(probs),probs.size(), probs[0], probs[1], probs[2], probs[3]
+                type(probs),probs.size(), probs[0,0], probs[0,1], probs[0,2], probs[0,3]
             )
         ) 
         print("Probs tensor: {}".format(probs) )
-        
+        #"""
         gcam.backward(ids=ids[:, [claseToEval]])
         for target_layer in targeted_layers:
             #ids_ = torch.LongTensor([[claseToEval]] * len(images)).to(device)    #target_class]] * len(images)).to(device)
             #gcam.backward(ids=ids_)
             regions = gcam.generate(target_layer= target_layer)  
-            print("Type of regions: {}, shape: {}, Max value of regions: {},  Min value of regions: {}". format(
-                type(regions),regions.size(), torch.max(regions), torch.min(regions) 
-                )
-            )
+            #print("Type of regions: {}, shape: {}, Max value of regions: {},  Min value of regions: {}". format(
+            #    type(regions),regions.size(), torch.max(regions), torch.min(regions) 
+            #    )
+            #)
+            ######################
 
             save_gradcam(
                 filename=osp.join(
