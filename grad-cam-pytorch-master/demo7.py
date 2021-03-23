@@ -606,12 +606,12 @@ def demo9(image_path, output_dir, cuda):
 #@click.option("-i", "--images_folder_path", type=str, multiple=True, required=True)
 @click.option("-i", "--images_folder_path", type=str, required=True)
 @click.option("-t", "--namemodel_loaded", type=str, required=True)
-#@click.option("-c", "--claseToEval", type=int, required=True)
+@click.option("-k", "--clase_to_eval", type=int, required=True)
 @click.option("-o", "--output-dir", type=str, default="./results")
 @click.option("--cuda/--cpu", default=True)
 #def demo0(image_paths, claseToEval, output_dir, cuda):
-def democlass3(images_folder_path, namemodel_loaded, output_dir, cuda):
-    print("Demo Class 3 running")
+def democlass(images_folder_path, namemodel_loaded, clase_to_eval, output_dir, cuda):
+    print("Demo Class running")
     gpu_space(all = True) #prints the total GPU RAM, 
                           #reserved, availableallocated, free and reduced.
 
@@ -619,7 +619,7 @@ def democlass3(images_folder_path, namemodel_loaded, output_dir, cuda):
     device = get_device(cuda)
     num_classes=4 #Output clases of the NN model.
     targeted_layers = ["avgpool"] #Layers to generated GradCAM on.
-    claseToEval = 3 #clase to be evaluated out of the 4 possible.
+    claseToEval = clase_to_eval #3 #clase to be evaluated out of the 4 possible.
 
     #  Names of the NN models to be loaded
     #NameModelLoaded = "vgg16_4c_combined.ckpt"
