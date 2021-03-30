@@ -143,14 +143,44 @@ class GradCAM(_BaseWrapper):
     def generate(self, target_layer):
         fmaps = self._find(self.fmap_pool, target_layer)
         grads = self._find(self.grad_pool, target_layer)
+        """
+        print("  fmaps type: {}, shape: {}, Max value: {},  Min value: {}". format(
+            type(fmaps), fmaps.size(), torch.max(fmaps), torch.min(fmaps)
+            )
+        ) 
+        #print(fmaps)
+        print("  grads type: {}, shape: {}, Max value: {},  Min value: {}". format(
+            type(grads), grads.size(), torch.max(grads), torch.min(grads)
+            )
+        ) 
+        #print(grads)
+        #"""
         weights = F.adaptive_avg_pool2d(grads, 1)
+        """
+        print("  weights type: {}, shape: {}, Max value: {},  Min value: {}". format(
+            type(weights), weights.size(), torch.max(weights), torch.min(weights)
+            )
+        )
+        #"""
         #print("----<<<<----GENERATE:")
         #print("weights type: {} and size: {}, Max:{}, Min:{}".format(
         #    type(weights), weights.size(), torch.max(weights), torch.min(weights)
         #    )
         #)
         gcam = torch.mul(fmaps, weights).sum(dim=1, keepdim=True)
+        """
+        print("  gcam type: {}, shape: {}, Max value: {},  Min value: {}". format(
+            type(gcam), gcam.size(), torch.max(gcam), torch.min(gcam)
+            )
+        )
+        #"""
         gcam = F.relu(gcam)
+        """
+        print("  After RELU gcam type: {}, shape: {}, Max value: {},  Min value: {}". format(
+            type(gcam), gcam.size(), torch.max(gcam), torch.min(gcam)
+            )
+        ) 
+        #"""
         gcam = F.interpolate(
             gcam, self.image_shape, mode="bilinear", align_corners=False
         )
@@ -162,7 +192,13 @@ class GradCAM(_BaseWrapper):
         B, C, H, W = gcam.shape
         gcam = gcam.view(B, -1)
         gcam -= gcam.min(dim=1, keepdim=True)[0]
-        if not (gcam.max(dim=1, keepdim=True)[0] ) == 0:
+        gcamMAX= gcam.max(dim=1, keepdim=True)[0]
+        #print("  gcamMAX type: {}, shape: {}, Max value: {},  Min value: {}". format(
+        #    type(gcamMAX), gcamMAX.size(), torch.max(gcamMAX), torch.min(gcamMAX)
+        #    )
+        #) 
+        #print(gcamMAX)
+        if not torch.min( gcam.max(dim=1, keepdim=True)[0] ) <= 0:
             gcam /= gcam.max(dim=1, keepdim=True)[0]
         gcam = gcam.view(B, C, H, W)
         #print("Returned gcam type: {} and size: {}, Max:{}, Min:{}".format(

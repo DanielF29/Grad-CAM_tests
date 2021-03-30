@@ -4,6 +4,8 @@
 *.zip
 *.rar
 *.csv
+*.xlsx
+*.txt
 grad-cam-pytorch-master/*.ckpt
 grad-cam-pytorch-master/ml_kidney_stones_main
 grad-cam-pytorch-master/docs
