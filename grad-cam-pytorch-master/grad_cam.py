@@ -192,7 +192,7 @@ class GradCAM(_BaseWrapper):
         B, C, H, W = gcam.shape
         gcam = gcam.view(B, -1)
         gcam -= gcam.min(dim=1, keepdim=True)[0]
-        gcamMAX= gcam.max(dim=1, keepdim=True)[0]
+        #gcamMAX= gcam.max(dim=1, keepdim=True)[0]
         #print("  gcamMAX type: {}, shape: {}, Max value: {},  Min value: {}". format(
         #    type(gcamMAX), gcamMAX.size(), torch.max(gcamMAX), torch.min(gcamMAX)
         #    )
