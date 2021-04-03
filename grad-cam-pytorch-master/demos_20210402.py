@@ -28,6 +28,7 @@ from grad_cam import (
 
 import glob #to ...obtain a list of certain types of files at a dicrectory..right?
 import os 
+import time
 
 # if a model includes LSTM, such as in image captioning,
 # torch.backends.cudnn.enabled = False
@@ -83,13 +84,13 @@ def preprocess(image_path):
     image = transforms.Compose(
         [
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],  std=[0.229, 0.224, 0.225]), #codigo original al descargar
+            #transforms.Normalize(mean=[0.485, 0.456, 0.406],  std=[0.229, 0.224, 0.225]), #codigo original al descargar
             #transforms.Normalize(mean=[0.614, 0.481, 0.3006], std=[0.0812, 0.0787, 0.0751]), #Segunda version, funciona bien con imagenes de Surface
             #Ultima version de parametros encontrados en el colab de Oscar: 
             # https://colab.research.google.com/drive/1Btjm46n2QPO291nLaIcexUjzIGQDiDt4?usp=sharing#scrollTo=n6h15OxgmpZU 
             #mean = np.array([0.624, 0.503, 0.335])
             #std = np.array([0.095, 0.097, 0.098])
-            #transforms.Normalize(mean=[0.624, 0.503, 0.335], std=[0.095, 0.097, 0.098]),
+            transforms.Normalize(mean=[0.624, 0.503, 0.335], std=[0.095, 0.097, 0.098]),
             
         ]
     )(raw_image[..., ::-1].copy())
@@ -204,8 +205,7 @@ def loading_NNModel(namemodel_loaded, num_classes=4 ):
         torch.nn.Linear(256, num_classes)
         )
     model_loaded = torch.load("{}".format(namemodel_loaded))
-    #print ("            >>>>>>>>> model <<<<<<<<<<<<")
-    #print(model)
+
     for l in model_loaded:
         #print(l)
         if l == "state_dict":
@@ -222,6 +222,8 @@ def loading_NNModel(namemodel_loaded, num_classes=4 ):
     #del layerName
     #del NewLayerName
     #del NameModelLoaded
+    #print ("            >>>>>>>>> model <<<<<<<<<<<<")
+    #print(model)
 
     return model
 
@@ -272,7 +274,7 @@ def demo0(images_folder_path, namemodel_loaded, explanations, output_dir, cuda):
     #reserved, availableallocated, free and reduced.
     prevFree_GPUram = gpu_space(all = True, prevFree_GPUram = 0.0)                
     num_classes=4
-    #targeted_layers = ["features.30", "avgpool"]
+    #targeted_layers = ["features.28", "avgpool"]
     targeted_layers = ["avgpool"]
     #targeted_layers = ["features.29"]
 
@@ -303,6 +305,7 @@ def demo0(images_folder_path, namemodel_loaded, explanations, output_dir, cuda):
     #  Grad-CAM
     gcam = GradCAM(model=model)#, target_layer= targeted_layers) #Suponiendo que se retendran menos "hooks"
     probs, ids = gcam.forward(images)
+    """
     print("  probs Type: {}, shape: {}, Probs: ". format(
         type(probs), probs.size(), torch.max(probs), torch.min(probs) 
         )
@@ -313,6 +316,7 @@ def demo0(images_folder_path, namemodel_loaded, explanations, output_dir, cuda):
         )
     ) 
     print(ids)
+    #"""
     # Guided Backpropagation
     gbp = GuidedBackPropagation(model=model)
     _ = gbp.forward(images)
@@ -329,7 +333,7 @@ def demo0(images_folder_path, namemodel_loaded, explanations, output_dir, cuda):
         for target_layer in targeted_layers:
             
             regions = gcam.generate(target_layer= target_layer)
-            #"""
+            """
             print("Type of regions: {}, shape: {}, Max value of regions: {},  Min value of regions: {}". format(
                 type(regions),regions.size(), torch.max(regions), torch.min(regions) 
                 )
@@ -338,11 +342,11 @@ def demo0(images_folder_path, namemodel_loaded, explanations, output_dir, cuda):
 
             for j in range(len(imagesList)):
                 print("(ids == claseToEval)[j]: {}".format(  (ids == claseToEval)[j]    ))
+                print("probs: {}".format(     probs[j, : ]    ))
                 Image_Name = Images_names(j, imagesList)
                 save_gradcam(
                     filename=osp.join(
                         output_dir,
-                        #"{}_{}_Class-{}_({:.5f}).png".format(
                         "{}-{}-C{}({:.5f})-{}-VGG16.png".format(
                             Image_Name, target_layer, claseToEval, float(probs[j, (ids == claseToEval)[j] ]), ModelType_name #float(probs[ids == claseToEval]) 
                             #probs[j, claseToEval]
@@ -358,7 +362,6 @@ def demo0(images_folder_path, namemodel_loaded, explanations, output_dir, cuda):
                     save_pure_gradcam(
                         filename=osp.join(
                             output_dir,
-                            #"{}_{}_Class-{}_({:.5f}).png".format(
                             "{}-{}-C{}({:.5f})-{}-PureGcamVGG16.png".format(
                                 Image_Name, target_layer,  claseToEval, float(probs[j, (ids == claseToEval)[j] ]), ModelType_name #float(probs[ids == claseToEval])
                                 #probs[j, claseToEval]
@@ -367,23 +370,20 @@ def demo0(images_folder_path, namemodel_loaded, explanations, output_dir, cuda):
                         gcam=regions[j, 0]
                     )
 
-                """
+                #"""
                 if explanations > 2:
                     # Guided Grad-CAM
                     save_gradient(
                         filename=osp.join(
                             output_dir,
-                            #"{}_{}_Class-{}_({:.5f}).png".format(
-                            "{}-{}-{}-C{}({:.5f})VGG16guidedGcam.png".format(
-                                Image_Name, target_layer, claseToEval, probs[j, claseToEval], ModelType_name #float(probs[ids == claseToEval])
+                            "{}-{}-C{}({:.5f})-{}-Guided-GcamVGG16.png".format(
+                            Image_Name, target_layer,  claseToEval, float(probs[j, (ids == claseToEval)[j] ]), ModelType_name #float(probs[ids == claseToEval])
                             ),
                         ),
-                        gradient=torch.mul(regions, gradients)[0]
-                        #gradient=torch.mul(regions, gradients)[0],
-                        #raw_image=raw_images[0],
-                        #paper_cmap=True, valance=0.3
+                        gradient=torch.mul(regions, gradients)[j]
                     )
                 #"""
+
         """
         #Borrado de variables del ultimo ciclo "For"
         gcam.remove_hook()
@@ -398,7 +398,7 @@ def demo0(images_folder_path, namemodel_loaded, explanations, output_dir, cuda):
         del regions
         del gradients
         # """
-        prevFree_GPUram = gpu_space(prevFree_GPUram)
+    prevFree_GPUram = gpu_space(prevFree_GPUram)
 
     #volver a identar si se vuelve a colocar el "FOR" para imagenes
     ##############################
@@ -611,6 +611,78 @@ def demo2(image_paths, output_dir, cuda):
                 gcam=regions[j, 0],
                 raw_image=raw_images[j],
             )
+
+@main.command()
+@click.option("-i", "--images_folder_path", type=str, required=True)
+@click.option("-t", "--namemodel_loaded", type=str, required=True)
+#@click.option("-a", "--arch", type=click.Choice(model_names), required=True)
+#@click.option("-k", "--topk", type=int, default=3)
+@click.option("-s", "--stride", type=int, default=1)    #original was at 1
+@click.option("-b", "--n-batches", type=int, default=16) #original was at 128
+@click.option("-o", "--output-dir", type=str, default="./results")
+@click.option("--cuda/--cpu", default=True)
+def demo3(images_folder_path, namemodel_loaded, stride, n_batches, output_dir, cuda):
+    """
+    Generate occlusion sensitivity maps
+    """
+    start = time.time()
+    device = get_device(cuda)
+    prevFree_GPUram = gpu_space(all = True, prevFree_GPUram = 0.0)    
+    num_classes=4 
+    # Model from torchvision
+    #model = models.__dict__[arch](pretrained=True)
+    ModelType_name = namemodel_loaded.split("_")[-1]
+    ModelType_name = ModelType_name.split(".")[0]
+    model = loading_NNModel(namemodel_loaded, num_classes)    
+    #model = torch.nn.DataParallel(model)
+    model.to(device)
+    model.eval()
+
+    # Images
+    imagesList = glob.glob('{}/*.png'.format(images_folder_path))
+    images, _ = load_images(imagesList)
+    images = torch.stack(images).to(device)
+
+    print("Occlusion Sensitivity:")
+    #patche_sizes = [10, 15, 25, 35, 45, 90]
+    patche_sizes = [10]
+
+    logits = model(images)
+    probs = F.softmax(logits, dim=1)
+    probs, ids = probs.sort(dim=1, descending=True)
+    prevFree_GPUram = gpu_space(prevFree_GPUram)
+    print(" ------<<<<<------<<<<<-----Before FORs----->>>>>-------->>>>>------")
+    #for i in range(4): #claseToEval #originally--> for i in range(topk):
+    claseToEval = 0
+    for p in patche_sizes:
+        print("Patch:", p)
+        prevFree_GPUram = gpu_space(prevFree_GPUram)
+        sensitivity = occlusion_sensitivity(
+            model, images, ids[:, [claseToEval]], patch=p, stride=stride, n_batches=n_batches
+        )
+        prevFree_GPUram = gpu_space(prevFree_GPUram)
+
+        # Save results as image files
+        for j in range(len(images)):
+            Image_Name = Images_names(j, imagesList)
+            print("\t{}-C{} ({:.5f})".format(Image_Name, claseToEval, probs[j, claseToEval]))
+            save_sensitivity(
+                filename=osp.join(
+                    output_dir,
+                    #"{}-{}-sensitivity-{}-{}.png".format(
+                    #    j, arch, p, classes[ids[j, i]]
+                    "{}-C{}({:.5f})-{}-VGG16.png".format(
+                        Image_Name, claseToEval, float(probs[j, (ids == claseToEval)[j] ]), ModelType_name
+                    ),
+                ),
+                maps=sensitivity[j],
+            )
+    end = time.time()
+    printing_spaces()
+    print(end - start)
+    print("          -------->>>END<<<<-----------")
+    print("----------   Occlusion Sensitivity        ")
+    print("          -------->>><<<<-----------")
 
 if __name__ == "__main__":
     #torch.cuda.empty_cache()
