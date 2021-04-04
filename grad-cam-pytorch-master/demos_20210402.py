@@ -665,7 +665,7 @@ def demo3(images_folder_path, namemodel_loaded, stride, n_batches, output_dir, c
             # Save results as image files
             for j in range(len(images)):
                 Image_Name = Images_names(j, imagesList)
-                print("\t{}-C{} ({:.5f})".format(Image_Name, claseToEval, probs[j, claseToEval]))
+                print("\t{}-C{} ({:.5f})".format(Image_Name, claseToEval, float(probs[j, (ids == claseToEval)[j] ])
                 save_sensitivity(
                     filename=osp.join(
                         output_dir,
