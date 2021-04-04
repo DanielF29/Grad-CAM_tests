@@ -652,34 +652,37 @@ def demo3(images_folder_path, namemodel_loaded, stride, n_batches, output_dir, c
     probs, ids = probs.sort(dim=1, descending=True)
     prevFree_GPUram = gpu_space(prevFree_GPUram)
     print(" ------<<<<<------<<<<<-----Before FORs----->>>>>-------->>>>>------")
-    #for i in range(4): #claseToEval #originally--> for i in range(topk):
-    claseToEval = 0
-    for p in patche_sizes:
-        print("Patch:", p)
-        prevFree_GPUram = gpu_space(prevFree_GPUram)
-        sensitivity = occlusion_sensitivity(
-            model, images, ids[:, [claseToEval]], patch=p, stride=stride, n_batches=n_batches
-        )
-        prevFree_GPUram = gpu_space(prevFree_GPUram)
-
-        # Save results as image files
-        for j in range(len(images)):
-            Image_Name = Images_names(j, imagesList)
-            print("\t{}-C{} ({:.5f})".format(Image_Name, claseToEval, probs[j, claseToEval]))
-            save_sensitivity(
-                filename=osp.join(
-                    output_dir,
-                    #"{}-{}-sensitivity-{}-{}.png".format(
-                    #    j, arch, p, classes[ids[j, i]]
-                    "{}-C{}({:.5f})-{}-VGG16.png".format(
-                        Image_Name, claseToEval, float(probs[j, (ids == claseToEval)[j] ]), ModelType_name
-                    ),
-                ),
-                maps=sensitivity[j],
+    for claseToEval in range(4): #claseToEval #originally--> for i in range(topk):
+        #claseToEval = 0
+        for p in patche_sizes:
+            print("Patch:", p)
+            prevFree_GPUram = gpu_space(prevFree_GPUram)
+            sensitivity = occlusion_sensitivity(
+                model, images, ids[:, [claseToEval]], patch=p, stride=stride, n_batches=n_batches
             )
+            prevFree_GPUram = gpu_space(prevFree_GPUram)
+
+            # Save results as image files
+            for j in range(len(images)):
+                Image_Name = Images_names(j, imagesList)
+                print("\t{}-C{} ({:.5f})".format(Image_Name, claseToEval, probs[j, claseToEval]))
+                save_sensitivity(
+                    filename=osp.join(
+                        output_dir,
+                        #"{}-{}-sensitivity-{}-{}.png".format(
+                        #    j, arch, p, classes[ids[j, i]]
+                        "{}-C{}({:.5f})-{}-VGG16.png".format(
+                            Image_Name, claseToEval, float(probs[j, (ids == claseToEval)[j] ]), ModelType_name
+                        ),
+                    ),
+                    maps=sensitivity[j],
+                )
     end = time.time()
     printing_spaces()
-    print(end - start)
+    time_elapsed = end - start
+    time_elapsed_in_mins = time_elapsed // 60
+    time_elapsed = time_elapsed - time_elapsed_in_mins * 60
+    print("Mins:{} Seconds:{}".format(time_elapsed_in_mins, time_elapsed    ))
     print("          -------->>>END<<<<-----------")
     print("----------   Occlusion Sensitivity        ")
     print("          -------->>><<<<-----------")
