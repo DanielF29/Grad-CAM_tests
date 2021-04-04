@@ -616,12 +616,12 @@ def demo2(image_paths, output_dir, cuda):
 @click.option("-i", "--images_folder_path", type=str, required=True)
 @click.option("-t", "--namemodel_loaded", type=str, required=True)
 #@click.option("-a", "--arch", type=click.Choice(model_names), required=True)
-#@click.option("-k", "--topk", type=int, default=3)
-@click.option("-s", "--stride", type=int, default=1)    #original was at 1
-@click.option("-b", "--n-batches", type=int, default=16) #original was at 128
+@click.option("-k", "--patche_size", type=int, default=10)
+@click.option("-s", "--stride", type=int, default=10)    #original was at 1
+@click.option("-b", "--n-batches", type=int, default=8) #original was at 128
 @click.option("-o", "--output-dir", type=str, default="./results")
 @click.option("--cuda/--cpu", default=True)
-def demo3(images_folder_path, namemodel_loaded, stride, n_batches, output_dir, cuda):
+def demo3(images_folder_path, namemodel_loaded, patche_size, stride, n_batches, output_dir, cuda):
     """
     Generate occlusion sensitivity maps
     """
@@ -645,7 +645,7 @@ def demo3(images_folder_path, namemodel_loaded, stride, n_batches, output_dir, c
 
     print("Occlusion Sensitivity:")
     #patche_sizes = [10, 15, 25, 35, 45, 90]
-    patche_sizes = [10]
+    patche_sizes = [patche_size]
 
     logits = model(images)
     probs = F.softmax(logits, dim=1)
@@ -654,18 +654,25 @@ def demo3(images_folder_path, namemodel_loaded, stride, n_batches, output_dir, c
     print(" ------<<<<<------<<<<<-----Before FORs----->>>>>-------->>>>>------")
     for claseToEval in range(4): #claseToEval #originally--> for i in range(topk):
         #claseToEval = 0
+        ids_ = torch.LongTensor([[claseToEval]] * len(images)).to(device)
         for p in patche_sizes:
             print("Patch:", p)
             prevFree_GPUram = gpu_space(prevFree_GPUram)
+            #print("probs:", probs )
+            #print("ids:", ids )
+            #print("ids_:", ids_ )
+            #print("ids[:, [claseToEval]]:", ids[:, [claseToEval]])
+
             sensitivity = occlusion_sensitivity(
-                model, images, ids[:, [claseToEval]], patch=p, stride=stride, n_batches=n_batches
+                model, images, ids_, patch=p, stride=stride, n_batches=n_batches
             )
             prevFree_GPUram = gpu_space(prevFree_GPUram)
 
             # Save results as image files
             for j in range(len(images)):
+                #print("(ids == claseToEval)[j]:", (ids == claseToEval)[j] )
                 Image_Name = Images_names(j, imagesList)
-                print("\t{}-C{} ({:.5f})".format(Image_Name, claseToEval, float(probs[j, (ids == claseToEval)[j] ])
+                print("\t{}-C{} ({:.5f})".format(Image_Name, claseToEval, float(probs[j, (ids == claseToEval)[j] ]) ))
                 save_sensitivity(
                     filename=osp.join(
                         output_dir,
