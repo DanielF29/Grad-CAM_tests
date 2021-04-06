@@ -344,7 +344,7 @@ def demo0(images_folder_path, namemodel_loaded, explanations, output_dir, cuda):
                 print("(ids == claseToEval)[j]: {}".format(  (ids == claseToEval)[j]    ))
                 print("probs: {}".format(     probs[j, : ]    ))
                 Image_Name = Images_names(j, imagesList)
-                save_gradcam(
+                save_gradcam2(
                     filename=osp.join(
                         output_dir,
                         "{}-{}-C{}({:.5f})-{}-VGG16.png".format(
@@ -646,6 +646,7 @@ def demo3(images_folder_path, namemodel_loaded, patche_size, stride, n_batches, 
     print("Occlusion Sensitivity:")
     #patche_sizes = [10, 15, 25, 35, 45, 90]
     patche_sizes = [patche_size]
+    print(patche_sizes)
 
     logits = model(images)
     probs = F.softmax(logits, dim=1)
