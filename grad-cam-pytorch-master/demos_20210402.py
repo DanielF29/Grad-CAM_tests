@@ -81,27 +81,27 @@ def preprocess(image_path):
     #print("-->>>> image_path:{} <<<<------".format(image_path))
     raw_image = cv2.imread(image_path)
     raw_image = cv2.resize(raw_image, (224,) * 2)
+    #Ultima version de parametros encontrados en el colab de Oscar: 
+    # https://colab.research.google.com/drive/1Btjm46n2QPO291nLaIcexUjzIGQDiDt4?usp=sharing#scrollTo=n6h15OxgmpZU 
+    #For RGB KidneyStones Patches (mixed/combined)
+    mean = np.array([0.624, 0.503, 0.335])
+    std = np.array([0.095, 0.097, 0.098])
+    #For BLUR images (sections)
+    #mean = np.array([0.6341, 0.5252, 0.335])
+    #std = np.array([0.1022, 0.1087, 0.1129])
+    #for BLUR images (mixed/combined)
+    #mean = np.array([0.624, 0.5031, 0.3359]
+    #std = np.array([0.0917, 0.0937, 0.0940])
+    #for Gray images (mixed/combined)
+    #mean = np.array([0.5202]
+    #std = np.array([0.0957])
     image = transforms.Compose(
         [
             transforms.ToTensor(),
             #transforms.Normalize(mean=[0.485, 0.456, 0.406],  std=[0.229, 0.224, 0.225]), #codigo original al descargar
             #transforms.Normalize(mean=[0.614, 0.481, 0.3006], std=[0.0812, 0.0787, 0.0751]), #Segunda version, funciona bien con imagenes de Surface
-            #Ultima version de parametros encontrados en el colab de Oscar: 
-            # https://colab.research.google.com/drive/1Btjm46n2QPO291nLaIcexUjzIGQDiDt4?usp=sharing#scrollTo=n6h15OxgmpZU 
-            #For RGB KidneyStones Patches (mixed/combined)
-            #mean = np.array([0.624, 0.503, 0.335])
-            #std = np.array([0.095, 0.097, 0.098])
-            #For BLUR images (sections)
-            #mean = np.array([0.6341, 0.5252, 0.335])
-            #std = np.array([0.1022, 0.1087, 0.1129])
-            #for BLUR images (mixed/combined)
-            #mean = np.array([0.624, 0.5031, 0.3359]
-            #std = np.array([0.0917, 0.0937, 0.0940])
-            #for Gray images (mixed/combined)
-            #mean = np.array([0.5202]
-            #std = np.array([0.0957])
 
-            transforms.Normalize(   mean= np.array([0.5202]), std= np.array([0.0957])   ),
+            transforms.Normalize(   mean= mean , std= std   ),
             
         ]
     )(raw_image[..., ::-1].copy())
